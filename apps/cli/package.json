@@ -1,0 +1,18 @@
+{
+  "name": "wav2amiga",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": { "wav2amiga": "dist/cli.js" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "yargs": "17.7.2",
+    "@wav2amiga/core": "workspace:*",
+    "@wav2amiga/node-io": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/yargs": "17.0.33",
+    "typescript": "5.6.3"
+  }
+}

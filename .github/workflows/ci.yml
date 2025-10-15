@@ -1,0 +1,27 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  build-test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: corepack enable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.17.0
+          cache: 'pnpm'
+      - run: pnpm -v
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build
+      - run: pnpm run test:unit
+      - run: pnpm run test:golden:wasm
+      - run: pnpm run test:cli:ffmpeg
+      - run: pnpm run versions:print
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: versions-${{ matrix.os }}
+          path: out/versions.json

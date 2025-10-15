@@ -1,0 +1,23 @@
+{
+  "mode": "single",
+  "outputFile": "output.8SVX",
+  "segments": [
+    {
+      "label": "input",
+      "note": "C-2",
+      "targetHz": 8287,
+      "startByte": 0,
+      "startOffsetHex": "00",
+      "lengthBytes": 800,
+      "paddedLengthBytes": 1024,
+      "paddedLength": 1024
+    }
+  ],
+  "versions": {
+    "node": "v20.19.0",
+    "pnpm": "unknown",
+    "ffmpeg": "unknown",
+    "wasmSha256": "unknown",
+    "git": "unknown"
+  }
+}

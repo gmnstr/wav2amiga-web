@@ -1,0 +1,9 @@
+{
+  "name": "wav2amiga-web",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:20",
+  "features": {},
+  "postCreateCommand": "corepack enable && pnpm -v && pnpm install",
+  "customizations": { "vscode": { "extensions": [
+    "ms-vscode.vscode-typescript-next", "dbaeumer.vscode-eslint"
+  ]}}
+}

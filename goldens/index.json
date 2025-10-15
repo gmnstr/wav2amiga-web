@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "toolchain": {
+    "node": "20.17.0",
+    "pnpm": "9.10.0",
+    "ffmpeg": "unknown",
+    "wasm": {
+      "package": "libsamplerate-wasm@0.2.0",
+      "sha256": "placeholder"
+    }
+  },
+  "cases": [
+    {
+      "id": "single_c2_sine",
+      "mode": "single",
+      "note": "C-2",
+      "inputs": ["cases/single_c2_sine/input.wav"],
+      "expect": {
+        "output": {
+          "path": "cases/single_c2_sine/output.8SVX",
+          "sha256": "placeholder"
+        },
+        "report": {
+          "path": "cases/single_c2_sine/report.json",
+          "sha256": "placeholder"
+        }
+      }
+    }
+  ]
+}
