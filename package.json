@@ -11,16 +11,17 @@
   },
   "scripts": {
     "build": "pnpm -r --filter ./packages/* --filter ./apps/* run build",
-    "lint": "echo 'Linting skipped - ESLint v9 config needs adjustment'",
+    "lint": "pnpm -r exec eslint .",
     "test": "pnpm run test:unit && pnpm run test:golden:wasm",
     "test:unit": "pnpm -r --filter ./packages/core run test",
-    "test:golden:wasm": "node tools/run-golden-tests.mjs --resampler wasm",
-    "test:cli:ffmpeg": "node tools/run-golden-tests.mjs --resampler ffmpeg --structure-only",
+    "test:golden:wasm": "pnpm -r --filter ./packages/* --filter ./apps/cli run build && node tools/run-golden-tests.mjs --resampler wasm",
+    "test:cli:ffmpeg": "pnpm -r --filter ./packages/* --filter ./apps/cli run build && node tools/run-golden-tests.mjs --resampler ffmpeg --structure-only",
     "versions:print": "node tools/versions.mjs",
     "goldens:regen": "node tools/regenerate-goldens.mjs"
   },
   "devDependencies": {
     "@eslint/js": "9.11.0",
+    "@typescript-eslint/eslint-plugin": "8",
     "@typescript-eslint/parser": "^8.46.1",
     "eslint": "9.11.0",
     "eslint-config-prettier": "9.1.0",
