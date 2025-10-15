@@ -1,13 +1,4 @@
-import {
-  mapPcm16To8Bit,
-  validateMonoPcm16,
-  noteToTargetHz,
-  generateSingleFilename,
-  generateStackedFilename,
-  generateStackedEqualFilename,
-  calculateStackedEqualLayout,
-  alignTo256,
-} from "@wav2amiga/core";
+import { noteToTargetHz } from "@wav2amiga/core";
 
 // DOM elements
 const dropZone = document.getElementById("dropZone")!;
@@ -82,7 +73,7 @@ async function handleFile(file: File) {
       output.textContent += `Channels: ${currentAudioBuffer.numberOfChannels}\n`;
 
       convertBtn.disabled = false;
-    } catch (webAudioError) {
+    } catch {
       // Fallback to manual parsing if Web Audio API fails
       showWarning("Using basic WAV parsing (no resampling). For best results, use properly formatted WAV files.");
       await parseWavManually(arrayBuffer);
@@ -98,7 +89,7 @@ async function parseWavManually(arrayBuffer: ArrayBuffer) {
 
   // Basic WAV header parsing
   const riff = view.getUint32(0, true);
-  const fileSize = view.getUint32(4, true);
+  // const fileSize = view.getUint32(4, true);
   const wave = view.getUint32(8, true);
 
   if (riff !== 0x52494646 || wave !== 0x57415645) { // "RIFF" and "WAVE"

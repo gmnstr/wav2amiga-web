@@ -4,10 +4,7 @@ import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import {
-  decodeToPcm16,
-  decodeAndResampleToPcm16,
-} from "@wav2amiga/node-io";
+import { decodeToPcm16 } from "@wav2amiga/node-io";
 import {
   mapPcm16To8Bit,
   validateMonoPcm16,
@@ -316,7 +313,7 @@ async function main() {
 async function createEightSVXFile(
   outputPath: string,
   segments: SampleSegment[],
-  mode: StackingMode
+  _mode: StackingMode
 ): Promise<void> {
   const fd = fs.openSync(outputPath, "w");
 
