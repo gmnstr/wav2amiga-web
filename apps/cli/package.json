@@ -9,7 +9,8 @@
   "dependencies": {
     "yargs": "17.7.2",
     "@wav2amiga/core": "workspace:*",
-    "@wav2amiga/node-io": "workspace:*"
+    "@wav2amiga/node-io": "workspace:*",
+    "@wav2amiga/resampler-wasm": "workspace:*"
   },
   "devDependencies": {
     "@types/yargs": "17.0.33",

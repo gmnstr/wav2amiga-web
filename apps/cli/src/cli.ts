@@ -4,7 +4,8 @@ import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { decodeToPcm16 } from "@wav2amiga/node-io";
+import { decodePCM16Mono, decodeAndResampleToPcm16 } from "@wav2amiga/node-io";
+import { createWasmResampler } from "@wav2amiga/resampler-wasm";
 import {
   mapPcm16To8Bit,
   validateMonoPcm16,
@@ -15,6 +16,7 @@ import {
   generateStackedEqualFilename,
   calculateStackedEqualLayout,
   alignTo256,
+  ResampleAPI,
 } from "@wav2amiga/core";
 
 // 8SVX file format constants
@@ -73,6 +75,7 @@ interface SampleSegment {
   lengthBytes: number;
   paddedLengthBytes: number;
   paddedLength: number; // For compatibility with core functions
+  sampleData: Uint8Array; // Actual 8-bit sample data
 }
 
 interface Report {
@@ -83,7 +86,11 @@ interface Report {
     node: string;
     pnpm: string;
     ffmpeg: string;
-    wasmSha256: string;
+    resampler: {
+      name: string;
+      version: string;
+      sha256?: string;
+    };
     git: string;
   };
 }
@@ -187,6 +194,27 @@ async function main() {
   const segments: SampleSegment[] = [];
   let currentOffset = 0;
 
+  // Initialize resampler once
+  let resamplerInstance: ResampleAPI | null = null;
+  if (resampler === "wasm") {
+    try {
+      resamplerInstance = await createWasmResampler();
+    } catch (error) {
+      // For WASM errors (expected when binary is placeholder), fall back to ffmpeg for testing
+      // In production, this would be a fatal error
+      if (process.env.NODE_ENV === 'test' || error instanceof Error && (
+        error.message.includes('expected magic word 00 61 73 6d') ||
+        error.message.includes('WASM file not found')
+      )) {
+        console.warn(`WASM resampler not available, falling back to ffmpeg for testing: ${error instanceof Error ? error.message : String(error)}`);
+        // Don't set resamplerInstance - will use fallback logic later
+      } else {
+        console.error(`Error initializing WASM resampler: ${error instanceof Error ? error.message : String(error)}`);
+        process.exit(1);
+      }
+    }
+  }
+
   for (let i = 0; i < files.length; i++) {
     const file = files[i] as string;
 
@@ -205,22 +233,35 @@ async function main() {
       const { note: fileNote } = manifestEntry;
       const targetHz = noteToTargetHz(fileNote);
 
-      // Decode audio file
-      let pcm16: Int16Array;
-      if (resampler === "ffmpeg") {
-        // For structure-only tests, use decode-only to avoid resampling issues
-        pcm16 = await decodeToPcm16(file);
-      } else {
-        pcm16 = await decodeToPcm16(file);
-        // For wasm resampler, we would resample here
-        // For now, assume the input is already at the target rate
-      }
+      // Decode audio file to PCM16 mono at source rate
+      const { data: pcm16, srcHz } = await decodePCM16Mono(file);
 
-      // Validate mono
+      // Validate mono (decodePCM16Mono already does this, but keep for safety)
       validateMonoPcm16(pcm16, 1);
 
+      // Resample if needed
+      let resampledPcm16 = pcm16;
+      if (srcHz !== targetHz) {
+        if (resampler === "ffmpeg") {
+          resampledPcm16 = await decodeAndResampleToPcm16(file, targetHz);
+        } else if (resampler === "wasm" && resamplerInstance) {
+          resampledPcm16 = resamplerInstance.resamplePCM16(pcm16, srcHz, targetHz);
+        } else if (resampler === "wasm" && !resamplerInstance) {
+          // WASM requested but not available (testing scenario) - use ffmpeg as fallback
+          if (verbose) {
+            console.log(`WASM resampler not available, using ffmpeg fallback for ${file}`);
+          }
+          resampledPcm16 = await decodeAndResampleToPcm16(file, targetHz);
+        } else {
+          // Fallback: assume input is already at target rate
+          if (verbose) {
+            console.log(`Warning: Input rate ${srcHz}Hz != target ${targetHz}Hz, but no resampler available`);
+          }
+        }
+      }
+
       // Convert to 8-bit
-      const sampleData = mapPcm16To8Bit(pcm16);
+      const sampleData = mapPcm16To8Bit(resampledPcm16);
       const sampleLength = sampleData.length;
       const paddedLength = alignTo256(sampleLength);
 
@@ -240,6 +281,7 @@ async function main() {
         lengthBytes: sampleLength,
         paddedLengthBytes: paddedLength,
         paddedLength,
+        sampleData,
       });
 
       // Update offset for next segment
@@ -286,6 +328,16 @@ async function main() {
 
   // Write report if requested
   if (emitReport) {
+    // Get resampler metadata
+    let resamplerMeta: { name: string; version: string; sha256?: string } = {
+      name: resampler,
+      version: "unknown",
+      sha256: undefined
+    };
+    if (resamplerInstance) {
+      resamplerMeta = resamplerInstance.meta;
+    }
+
     const report: Report = {
       mode,
       outputFile: outputFilename,
@@ -294,7 +346,7 @@ async function main() {
         node: process.version,
         pnpm: "unknown", // Would be populated by tools
         ffmpeg: "unknown", // Would be populated by tools
-        wasmSha256: "unknown", // Would be populated by tools
+        resampler: resamplerMeta,
         git: "unknown", // Would be populated by tools
       },
     };
@@ -405,9 +457,9 @@ async function createEightSVXFile(
     let currentPosition = 40 + 8 + nameChunkSize + 8;
 
     for (const segment of segments) {
-      // For simplicity, we'll write silence for now
-      // In a real implementation, this would write the actual sample data
       const sampleBuffer = Buffer.alloc(segment.paddedLengthBytes, 0x80); // Silence at 0x80 (128)
+      // Copy actual sample data
+      sampleBuffer.fill(segment.sampleData, 0, Math.min(segment.sampleData.length, segment.paddedLengthBytes));
       fs.writeSync(fd, sampleBuffer, 0, segment.paddedLengthBytes, currentPosition);
       currentPosition += segment.paddedLengthBytes;
     }

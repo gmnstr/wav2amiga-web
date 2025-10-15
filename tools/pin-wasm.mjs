@@ -3,96 +3,89 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as crypto from "node:crypto";
+import { fileURLToPath } from "node:url";
 
-/**
- * Pins the libsamplerate-wasm binary SHA256
- * Finds the WASM file and computes its SHA256 hash
- */
-async function pinWasm() {
-  const nodeModulesDir = path.join(process.cwd(), "node_modules");
-  const wasmPath = path.join(nodeModulesDir, "libsamplerate-wasm", "*.wasm");
+// ESM equivalent of __dirname
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const rootDir = path.resolve(__dirname, "..");
+const wasmPath = path.resolve(rootDir, "packages/resampler-wasm/assets/libsamplerate.wasm");
+const versionPath = path.resolve(rootDir, "packages/resampler-wasm/VERSION.json");
 
-  // Find WASM file
-  let wasmFilePath;
-  try {
-    const { execSync } = await import("node:child_process");
-    const findResult = execSync(`find "${nodeModulesDir}" -name "*.wasm" -path "*libsamplerate-wasm*" | head -1`, {
-      encoding: "utf-8"
-    }).trim();
+// URL for libsamplerate WASM binary
+// This is a placeholder - in a real implementation, this would point to a CDN or build artifact
+const WASM_URL = "https://example.com/libsamplerate.wasm";
 
-    if (!findResult) {
-      throw new Error("No WASM file found in libsamplerate-wasm package");
-    }
+async function downloadWasm(url) {
+  console.log(`Downloading WASM binary from ${url}...`);
 
-    wasmFilePath = findResult;
-  } catch (error) {
-    console.error("Error finding WASM file:", error.message);
-    process.exit(1);
-  }
+  // For now, we'll create a placeholder since we don't have a real WASM URL
+  // In practice, this would use fetch or curl to download the actual binary
+  throw new Error(
+    "WASM binary download not implemented. " +
+    "Please manually place the libsamplerate.wasm binary in packages/resampler-wasm/assets/ " +
+    "and run this script to compute SHA256."
+  );
+}
 
-  // Read WASM file
-  let wasmBuffer;
-  try {
-    wasmBuffer = fs.readFileSync(wasmFilePath);
-  } catch (error) {
-    console.error(`Error reading WASM file ${wasmFilePath}:`, error.message);
-    process.exit(1);
-  }
+function computeSha256(filePath) {
+  const fileBuffer = fs.readFileSync(filePath);
+  const hashSum = crypto.createHash("sha256");
+  hashSum.update(fileBuffer);
+  return hashSum.digest("hex");
+}
 
-  // Compute SHA256
-  const sha256 = crypto.createHash('sha256').update(wasmBuffer).digest('hex');
+function readPackageVersion() {
+  const packagePath = path.resolve(rootDir, "packages/resampler-wasm/package.json");
+  const packageJson = JSON.parse(fs.readFileSync(packagePath, "utf-8"));
+  return packageJson.version;
+}
 
-  // Get package version
-  let packageVersion = "unknown";
-  try {
-    const packagePath = path.join(nodeModulesDir, "libsamplerate-wasm", "package.json");
-    if (fs.existsSync(packagePath)) {
-      const packageInfo = JSON.parse(fs.readFileSync(packagePath, "utf-8"));
-      packageVersion = packageInfo.version;
-    }
-  } catch (error) {
-    console.warn("Could not read libsamplerate-wasm package.json:", error.message);
-  }
-
-  // Write wasm.json
-  const wasmInfo = {
-    package: `libsamplerate-wasm@${packageVersion}`,
-    sha256: sha256,
-    pinnedAt: new Date().toISOString(),
+function updateVersionJson(sha256) {
+  const version = readPackageVersion();
+  const versionInfo = {
+    version,
+    sha256,
+    flags: "SINC_BEST_QUALITY"
   };
 
-  const toolsDir = path.join(process.cwd(), "tools");
-  if (!fs.existsSync(toolsDir)) {
-    fs.mkdirSync(toolsDir, { recursive: true });
-  }
-
-  const wasmJsonPath = path.join(toolsDir, "wasm.json");
-  fs.writeFileSync(wasmJsonPath, JSON.stringify(wasmInfo, null, 2));
-
-  console.log(`✅ Pinned libsamplerate-wasm@${packageVersion}`);
-  console.log(`SHA256: ${sha256}`);
-  console.log(`WASM info written to ${wasmJsonPath}`);
+  fs.writeFileSync(versionPath, JSON.stringify(versionInfo, null, 2));
+  console.log(`Updated ${versionPath} with SHA256: ${sha256}`);
 }
 
-/**
- * Main function
- */
 async function main() {
-  if (process.argv.includes('--help') || process.argv.includes('-h')) {
-    console.log("Usage: node tools/pin-wasm.mjs");
-    console.log("");
-    console.log("Pins the libsamplerate-wasm binary by computing its SHA256 hash");
-    console.log("and storing the result in tools/wasm.json for golden test validation.");
-    console.log("");
-    console.log("This should be run after installing dependencies to record the exact");
-    console.log("WASM binary that will be used for resampling.");
-    process.exit(0);
-  }
+  try {
+    // Check if WASM file already exists
+    if (fs.existsSync(wasmPath)) {
+      console.log(`WASM file already exists at ${wasmPath}`);
 
-  await pinWasm();
+      // Compute SHA256 of existing file
+      const sha256 = computeSha256(wasmPath);
+      updateVersionJson(sha256);
+
+      console.log("WASM binary is pinned successfully!");
+    } else {
+      console.log(`WASM file not found at ${wasmPath}`);
+
+      // For now, we'll skip the download and just create a placeholder VERSION.json
+      // In a real implementation, we would download from WASM_URL
+      console.log("Creating placeholder VERSION.json (WASM binary needs to be provided separately)");
+
+      const version = readPackageVersion();
+      const versionInfo = {
+        version,
+        sha256: "placeholder-sha256",
+        flags: "SINC_BEST_QUALITY"
+      };
+
+      fs.writeFileSync(versionPath, JSON.stringify(versionInfo, null, 2));
+      console.log(`Created placeholder ${versionPath}`);
+      console.log("Please manually place the libsamplerate.wasm binary in packages/resampler-wasm/assets/");
+      console.log("Then run this script again to compute the SHA256.");
+    }
+  } catch (error) {
+    console.error(`Error: ${error.message}`);
+    process.exit(1);
+  }
 }
 
-main().catch((error) => {
-  console.error("Error:", error.message);
-  process.exit(1);
-});
+main();

@@ -1,0 +1,27 @@
+{
+  "name": "@wav2amiga/resampler-wasm",
+  "version": "1.0.0",
+  "description": "libsamplerate WASM binary and loader for wav2amiga",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "exports": {
+    ".": {
+      "node": "./dist/index.js",
+      "browser": "./dist/browser.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@wav2amiga/core": "workspace:*"
+  },
+  "files": [
+    "dist",
+    "assets",
+    "VERSION.json"
+  ]
+}

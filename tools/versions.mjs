@@ -18,7 +18,11 @@ export async function getVersions() {
     node: process.version,
     pnpm: "unknown",
     ffmpeg: "unknown",
-    wasmSha256: "unknown",
+    resampler: {
+      name: "wasm",
+      version: "unknown",
+      sha256: "unknown"
+    },
     git: "unknown",
   };
 
@@ -40,14 +44,18 @@ export async function getVersions() {
       }
     }
 
-    // Get wasm SHA256
-    const wasmJsonPath = path.join(process.cwd(), "tools", "wasm.json");
-    if (fs.existsSync(wasmJsonPath)) {
+    // Get resampler metadata
+    const versionJsonPath = path.join(process.cwd(), "packages", "resampler-wasm", "VERSION.json");
+    if (fs.existsSync(versionJsonPath)) {
       try {
-        const wasmInfo = JSON.parse(fs.readFileSync(wasmJsonPath, "utf-8"));
-        versions.wasmSha256 = wasmInfo.sha256 || "unknown";
+        const versionInfo = JSON.parse(fs.readFileSync(versionJsonPath, "utf-8"));
+        versions.resampler = {
+          name: "wasm",
+          version: versionInfo.version || "unknown",
+          sha256: versionInfo.sha256 || "unknown"
+        };
       } catch (error) {
-        console.warn("Could not read wasm.json:", error.message);
+        console.warn("Could not read VERSION.json:", error.message);
       }
     }
 
@@ -77,7 +85,7 @@ async function main() {
   console.log(`Node.js: ${versions.node}`);
   console.log(`pnpm: ${versions.pnpm}`);
   console.log(`FFmpeg: ${versions.ffmpeg.split('\n')[0] || 'unknown'}`);
-  console.log(`WASM SHA256: ${versions.wasmSha256}`);
+  console.log(`Resampler: ${versions.resampler.name}@${versions.resampler.version} (${versions.resampler.sha256})`);
   console.log(`Git commit: ${versions.git}`);
 
   // Write to out/versions.json

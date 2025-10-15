@@ -5,6 +5,7 @@ export default defineConfig({
   build: {
     outDir: "dist",
     assetsDir: "assets",
+    assetsInlineLimit: 0, // Ensure WASM files are emitted as separate assets
   },
   server: {
     port: 3000,

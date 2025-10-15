@@ -1,6 +1,8 @@
 // Pure TypeScript business logic for wav2amiga conversion
 // No Node.js or browser APIs - works in both environments
 
+export type { ResampleAPI, ResamplerMeta } from "./resampler.js";
+
 /**
  * Maps 16-bit PCM samples to 8-bit values.
  * Input range: -32768 to 32767
@@ -23,6 +25,18 @@ export function mapPcm16To8Bit(input: Int16Array): Uint8Array {
  */
 export function alignTo256(length: number): number {
   return (length + 0xff) & ~0xff;
+}
+
+/**
+ * Alignment boundary for 8SVX sample data (256 bytes).
+ */
+export const ALIGN = 0x100;
+
+/**
+ * Checks if a number is aligned to 256-byte boundary.
+ */
+export function isAligned256(n: number): boolean {
+  return (n & 0xff) === 0;
 }
 
 /**
@@ -119,4 +133,118 @@ export function validateMonoPcm16(input: Int16Array, channels: number): void {
   if (channels !== 1) {
     throw new Error(`Input must be mono (1 channel), got ${channels} channels`);
   }
+}
+
+/**
+ * Result of building stacked segments with sequential alignment.
+ */
+export interface BuiltStack {
+  output: Uint8Array;      // concatenated data + per-segment padding
+  starts: number[];        // byte offsets for segment starts
+}
+
+/**
+ * Result of building stacked-equal segments with uniform slots.
+ */
+export interface BuiltStackEqual extends BuiltStack {
+  slot: number;            // common slot size (largest aligned length)
+}
+
+/**
+ * Builds segments in stacked mode: sequential with 0x100-aligned padding.
+ * start(i) = sum_{k < i} alignTo256(len_k)
+ */
+export function buildStacked(parts: Uint8Array[]): BuiltStack {
+  const starts: number[] = [];
+  const segments: Uint8Array[] = [];
+
+  let currentOffset = 0;
+  for (const part of parts) {
+    starts.push(currentOffset);
+    segments.push(part);
+
+    // Pad to next 256-byte boundary
+    const alignedLength = alignTo256(part.length);
+    currentOffset += alignedLength;
+  }
+
+  // Concatenate all segments with padding
+  const totalLength = currentOffset;
+  const output = new Uint8Array(totalLength);
+
+  let offset = 0;
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    const alignedLength = alignTo256(part.length);
+
+    // Copy the actual data
+    output.set(part, offset);
+
+    // Padding is already zeros from new Uint8Array
+    offset += alignedLength;
+  }
+
+  return { output, starts };
+}
+
+/**
+ * Builds segments in stacked-equal mode: uniform slots with equal spacing.
+ * slot = max_i alignTo256(len_i); start(i) = i * slot
+ */
+export function buildStackedEqual(parts: Uint8Array[]): BuiltStackEqual {
+  if (parts.length === 0) {
+    return { output: new Uint8Array(0), starts: [], slot: 0 };
+  }
+
+  // Find maximum aligned length for slot size
+  const alignedLengths = parts.map(part => alignTo256(part.length));
+  const slot = Math.max(...alignedLengths);
+
+  const starts: number[] = [];
+  const segments: Uint8Array[] = [];
+
+  for (let i = 0; i < parts.length; i++) {
+    starts.push(i * slot);
+    segments.push(parts[i]);
+  }
+
+  // Create output array with uniform slot spacing
+  const output = new Uint8Array(parts.length * slot);
+
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    const startOffset = i * slot;
+
+    // Copy the actual data
+    output.set(part, startOffset);
+
+    // Padding is already zeros from new Uint8Array
+  }
+
+  return { output, starts, slot };
+}
+
+/**
+ * Formats a byte offset as uppercase hexadecimal string, minimum 2 characters.
+ */
+export function formatOffsetHex(n: number): string {
+  const h = Math.max(0, n).toString(16).toUpperCase();
+  return h.length < 2 ? h.padStart(2, '0') : h;
+}
+
+/**
+ * Generates filename for stacked mode output using new builder API.
+ * Format: basename_00_05_09.8SVX where 00, 05, 09 are hex byte offsets
+ */
+export function filenameForStacked(base: string, starts: number[]): string {
+  const off = starts.map(b => formatOffsetHex(b >> 8)).join('_');
+  return `${base}_${off}.8SVX`;
+}
+
+/**
+ * Generates filename for stacked-equal mode output using new builder API.
+ * Format: basename_XX.8SVX where XX is the uniform slot increment in hex
+ */
+export function filenameForStackedEqual(base: string, slot: number): string {
+  return `${base}_${formatOffsetHex(slot >> 8)}.8SVX`;
 }

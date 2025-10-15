@@ -44,6 +44,9 @@ importers:
       '@wav2amiga/node-io':
         specifier: workspace:*
         version: link:../../packages/node-io
+      '@wav2amiga/resampler-wasm':
+        specifier: workspace:*
+        version: link:../../packages/resampler-wasm
       yargs:
         specifier: 17.7.2
         version: 17.7.2
@@ -60,6 +63,9 @@ importers:
       '@wav2amiga/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@wav2amiga/resampler-wasm':
+        specifier: workspace:*
+        version: link:../../packages/resampler-wasm
     devDependencies:
       typescript:
         specifier: 5.6.3
@@ -89,6 +95,12 @@ importers:
       typescript:
         specifier: 5.6.3
         version: 5.6.3
+
+  packages/resampler-wasm:
+    dependencies:
+      '@wav2amiga/core':
+        specifier: workspace:*
+        version: link:../core
 
 packages:
 

@@ -1,4 +1,5 @@
-import { noteToTargetHz } from "@wav2amiga/core";
+import { noteToTargetHz, ResampleAPI, mapPcm16To8Bit } from "@wav2amiga/core";
+import { createWasmResampler } from "@wav2amiga/resampler-wasm";
 
 // DOM elements
 const dropZone = document.getElementById("dropZone")!;
@@ -8,10 +9,25 @@ const noteSelect = document.getElementById("note") as HTMLSelectElement;
 const convertBtn = document.getElementById("convertBtn") as HTMLButtonElement;
 const downloadBtn = document.getElementById("downloadBtn") as HTMLButtonElement;
 const output = document.getElementById("output")!;
+const previewBanner = document.getElementById("previewBanner")!;
 
 // State
 let currentAudioBuffer: AudioBuffer | null = null;
 let convertedData: Uint8Array | null = null;
+let wasmResampler: ResampleAPI | null = null;
+let usingPreviewQuality = false;
+
+// Initialize WASM resampler on startup
+async function initializeResampler() {
+  try {
+    wasmResampler = await createWasmResampler();
+    console.log("WASM resampler initialized successfully");
+  } catch (error) {
+    console.warn("WASM resampler not available, using preview quality:", error);
+    usingPreviewQuality = true;
+    previewBanner.style.display = "block";
+  }
+}
 
 // Initialize drag and drop
 dropZone.addEventListener("click", () => fileInput.click());
@@ -179,26 +195,51 @@ convertBtn.addEventListener("click", async () => {
     const note = noteSelect.value;
     const targetHz = noteToTargetHz(note);
 
-    // For web demo, we'll simulate the conversion process
-    // In a real implementation, we would:
-    // 1. Extract PCM16 data from AudioBuffer
-    // 2. Resample to target rate using Web Audio API or libsamplerate-wasm
-    // 3. Apply the core conversion logic
+    // Extract PCM16 data from AudioBuffer
+    const channelData = currentAudioBuffer.getChannelData(0);
+    const srcHz = currentAudioBuffer.sampleRate;
 
-    // For now, show what would happen
+    // Convert Float32 to Int16 PCM
+    const pcm16 = new Int16Array(channelData.length);
+    for (let i = 0; i < channelData.length; i++) {
+      // Clamp to int16 range
+      pcm16[i] = Math.max(-32768, Math.min(32767, Math.floor(channelData[i] * 32768)));
+    }
+
+    let resampledPcm16: Int16Array;
+
+    if (srcHz === targetHz) {
+      resampledPcm16 = pcm16;
+    } else if (wasmResampler && !usingPreviewQuality) {
+      // Use WASM resampler for high quality
+      resampledPcm16 = wasmResampler.resamplePCM16(pcm16, srcHz, targetHz);
+      output.textContent += `Resampled from ${srcHz}Hz to ${targetHz}Hz using WASM resampler\n`;
+    } else {
+      // Fallback to OfflineAudioContext for preview quality
+      resampledPcm16 = await resampleWithOfflineAudioContext(pcm16, srcHz, targetHz);
+      output.textContent += `Resampled from ${srcHz}Hz to ${targetHz}Hz using preview quality resampling\n`;
+    }
+
+    // Convert to 8-bit and create 8SVX structure (single mode for web demo)
+    const sampleData = mapPcm16To8Bit(resampledPcm16);
+    const paddedLength = (sampleData.length + 0xff) & ~0xff; // Align to 256 bytes
+    const paddedData = new Uint8Array(paddedLength);
+    paddedData.fill(sampleData, 0, sampleData.length);
+
     output.textContent += `Mode: ${mode}\n`;
     output.textContent += `Note: ${note}\n`;
     output.textContent += `Target sample rate: ${targetHz}Hz\n`;
+    output.textContent += `Original samples: ${pcm16.length}\n`;
+    output.textContent += `Resampled samples: ${resampledPcm16.length}\n`;
+    output.textContent += `Output bytes: ${paddedData.length}\n`;
 
-    // Simulate conversion
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // For web demo, create a minimal 8SVX file
+    convertedData = createMinimal8SVX(paddedData, targetHz);
 
     output.textContent += "Conversion completed!\n";
-    output.textContent += "In a full implementation, this would generate an 8SVX file.\n";
 
-    // Enable download button (simulated)
+    // Enable download button
     downloadBtn.disabled = false;
-    convertedData = new Uint8Array(1024); // Placeholder
 
   } catch (error) {
     showError(`Conversion error: ${error instanceof Error ? error.message : String(error)}`);
@@ -206,6 +247,95 @@ convertBtn.addEventListener("click", async () => {
     convertBtn.disabled = false;
   }
 });
+
+// Fallback resampling using OfflineAudioContext
+async function resampleWithOfflineAudioContext(
+  inputPcm16: Int16Array,
+  srcHz: number,
+  targetHz: number
+): Promise<Int16Array> {
+  const audioContext = new OfflineAudioContext(1, inputPcm16.length * targetHz / srcHz, targetHz);
+
+  // Create buffer with PCM16 data converted to float
+  const buffer = audioContext.createBuffer(1, inputPcm16.length, srcHz);
+  const channelData = buffer.getChannelData(0);
+
+  for (let i = 0; i < inputPcm16.length; i++) {
+    channelData[i] = inputPcm16[i] / 32768;
+  }
+
+  const source = audioContext.createBufferSource();
+  source.buffer = buffer;
+  source.connect(audioContext.destination);
+  source.start();
+
+  const renderedBuffer = await audioContext.startRendering();
+  const resampledChannelData = renderedBuffer.getChannelData(0);
+
+  // Convert back to Int16
+  const output = new Int16Array(resampledChannelData.length);
+  for (let i = 0; i < resampledChannelData.length; i++) {
+    output[i] = Math.max(-32768, Math.min(32767, Math.floor(resampledChannelData[i] * 32768)));
+  }
+
+  return output;
+}
+
+// Create a minimal 8SVX file for download
+function createMinimal8SVX(sampleData: Uint8Array, sampleRate: number): Uint8Array {
+  const name = "wav2amiga-web";
+  const nameChunkSize = (name.length + 1) & ~1; // Round up to even
+
+  // Calculate total size
+  const totalSize =
+    8 + // FORM header
+    4 + 4 + 20 + // VHDR chunk
+    4 + 4 + nameChunkSize + // NAME chunk
+    4 + 4 + // BODY header
+    sampleData.length; // Sample data
+
+  const buffer = new ArrayBuffer(totalSize);
+  const view = new DataView(buffer);
+
+  let pos = 0;
+
+  // FORM header
+  view.setUint32(pos, 0x464F524D, true); // "FORM"
+  view.setUint32(pos + 4, totalSize - 8, true);
+  view.setUint32(pos + 8, 0x38535658, true); // "8SVX"
+  pos += 12;
+
+  // VHDR chunk
+  view.setUint32(pos, 0x56484452, true); // "VHDR"
+  view.setUint32(pos + 4, 20, true);
+  view.setUint32(pos + 8, 0, true); // oneShotHiSamples
+  view.setUint32(pos + 12, 0, true); // repeatHiSamples
+  view.setUint32(pos + 16, 0, true); // samplesPerHiCycle
+  view.setUint32(pos + 20, sampleRate, true); // samplesPerSec
+  view.setUint16(pos + 24, 1, true); // ctOctave
+  view.setUint16(pos + 26, 0, true); // sCompression
+  pos += 28;
+
+  // NAME chunk
+  view.setUint32(pos, 0x4E414D45, true); // "NAME"
+  view.setUint32(pos + 4, nameChunkSize, true);
+  for (let i = 0; i < name.length; i++) {
+    view.setUint8(pos + 8 + i, name.charCodeAt(i));
+  }
+  pos += 8 + nameChunkSize;
+
+  // BODY chunk header
+  view.setUint32(pos, 0x424F4459, true); // "BODY"
+  view.setUint32(pos + 4, sampleData.length, true);
+  pos += 8;
+
+  // Sample data
+  for (let i = 0; i < sampleData.length; i++) {
+    view.setUint8(pos + i, sampleData[i]);
+  }
+
+  return new Uint8Array(buffer);
+}
 
 // Download button handler
 downloadBtn.addEventListener("click", () => {
@@ -234,5 +364,14 @@ function showWarning(message: string) {
 }
 
 // Initialize
-output.textContent = "Ready to convert WAV files to 8SVX format.\n";
-output.textContent += "Note: This is a preview implementation. Full functionality requires libsamplerate-wasm.\n";
+async function init() {
+  await initializeResampler();
+  output.textContent = "Ready to convert WAV files to 8SVX format.\n";
+  if (usingPreviewQuality) {
+    output.textContent += "Note: Using preview quality resampling. For best results, ensure libsamplerate-wasm is available.\n";
+  } else {
+    output.textContent += "Note: Using high-quality WASM resampling.\n";
+  }
+}
+
+init();
