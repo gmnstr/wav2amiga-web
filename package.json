@@ -10,12 +10,12 @@
     "pnpm": "9.10.0"
   },
   "scripts": {
-    "build": "pnpm -r --filter ./packages/* --filter ./apps/* run build",
+    "build": "pnpm -r run build",
     "lint": "pnpm -r exec eslint .",
     "test": "pnpm run test:unit && pnpm run test:golden:wasm",
     "test:unit": "pnpm -r --filter ./packages/core run test",
-    "test:golden:wasm": "pnpm -r --filter ./packages/* --filter ./apps/cli run build && node tools/run-golden-tests.mjs --resampler wasm",
-    "test:cli:ffmpeg": "pnpm -r --filter ./packages/* --filter ./apps/cli run build && node tools/run-golden-tests.mjs --resampler ffmpeg --structure-only",
+    "test:golden:wasm": "pnpm -r --filter ./packages/* run build && pnpm -r --filter ./apps/cli run build && node tools/run-golden-tests.mjs --resampler wasm",
+    "test:cli:ffmpeg": "pnpm -r --filter ./packages/* run build && pnpm -r --filter ./apps/cli run build && node tools/run-golden-tests.mjs --resampler ffmpeg --structure-only",
     "versions:print": "node tools/versions.mjs",
     "goldens:regen": "node tools/regenerate-goldens.mjs"
   },
