@@ -846,12 +846,12 @@
   ],
   "versions": {
     "node": "v20.19.0",
-    "pnpm": "unknown",
+    "pnpm": "9.10.0",
     "ffmpeg": "unknown",
     "resampler": {
       "name": "zoh",
       "version": "1.0.0"
     },
-    "git": "unknown"
+    "git": "273b33d2f93e4dc9f64a0febe10120aab8488e72"
   }
 }
