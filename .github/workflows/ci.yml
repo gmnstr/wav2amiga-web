@@ -123,6 +123,11 @@ jobs:
       W2A_OUT_DIR: out
     steps:
       - uses: actions/checkout@v4
+      - name: Verify web scripts are executable
+        run: |
+          test -x scripts/web-start.sh
+          test -x scripts/web-stop.sh
+          test -x scripts/web-status.sh
       - run: corepack enable
       - uses: actions/setup-node@v4.4.0
         with:

@@ -19,7 +19,10 @@
     "versions:print": "node tools/versions.mjs",
     "goldens:regen": "node tools/regenerate-goldens.mjs",
     "publish:dry-run": "mkdir -p out/publish-dryruns && pnpm -r --filter ./apps/cli exec npm publish --dry-run > out/publish-dryruns/cli.txt 2>&1",
-    "publish:dryrun": "pnpm run publish:dry-run"
+    "publish:dryrun": "pnpm run publish:dry-run",
+    "web:start": "scripts/web-start.sh",
+    "web:stop": "scripts/web-stop.sh",
+    "web:status": "scripts/web-status.sh"
   },
   "devDependencies": {
     "@eslint/js": "9.11.0",
