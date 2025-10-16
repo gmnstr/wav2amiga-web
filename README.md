@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/gmnstr/wav2amiga-web/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/gmnstr/wav2amiga-web/actions/workflows/ci.yml)
 [![Demo](https://img.shields.io/badge/demo-website-blue)](https://gmnstr.github.io/wav2amiga-web/)
-[![npm](https://img.shields.io/npm/v/wav2amiga)](https://www.npmjs.com/package/wav2amiga)
+[![Version](https://img.shields.io/badge/version-v0.1.0-blue)](https://github.com/gmnstr/wav2amiga-web)
 
 Convert WAV files to Amiga 8SVX format with high-quality resampling.
 
