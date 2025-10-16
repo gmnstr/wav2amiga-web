@@ -1,5 +1,9 @@
 # wav2amiga-web
 
+[![CI Ubuntu](https://github.com/gemini/wav2amiga-web/workflows/ci/badge.svg?event=push&branch=main)](https://github.com/gemini/wav2amiga-web/actions)
+[![CI macOS](https://github.com/gemini/wav2amiga-web/workflows/ci/badge.svg?event=push&branch=main)](https://github.com/gemini/wav2amiga-web/actions)
+[![CI Windows](https://github.com/gemini/wav2amiga-web/workflows/ci/badge.svg?event=push&branch=main)](https://github.com/gemini/wav2amiga-web/actions)
+
 Convert WAV files to Amiga 8SVX format with high-quality resampling.
 
 ## Features

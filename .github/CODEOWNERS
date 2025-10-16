@@ -1,0 +1,11 @@
+# Code owners for critical infrastructure files
+# These files require review from maintainers before merging
+
+# Golden test outputs - must be byte-identical across platforms
+goldens/** @gemini
+
+# Tool scripts - affect CI and development workflow
+tools/** @gemini
+
+# GitHub Actions workflows - affect CI pipeline
+.github/workflows/** @gemini

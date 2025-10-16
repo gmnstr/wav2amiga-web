@@ -1,6 +1,13 @@
 name: ci
 on: [push, pull_request]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
   unit:
     runs-on: ubuntu-latest
@@ -11,8 +18,15 @@ jobs:
         with:
           node-version: '20.x'
           cache: 'pnpm'
+      - name: Environment dump
+        run: |
+          echo "OS: $(uname -a)"
+          echo "Node: $(node --version)"
+          echo "pnpm: $(pnpm --version)"
+          echo "FFmpeg: $(which ffmpeg || echo 'not in PATH')"
       - run: pnpm -v
       - run: pnpm install --frozen-lockfile
+      - run: node tools/check-toolchain.mjs
       - run: pnpm run build
       - run: pnpm run test:unit
       - run: pnpm run versions:print
@@ -37,32 +51,44 @@ jobs:
     runs-on: ${{ matrix.os }}
     name: golden-byteequal (${{ matrix.label }})
     steps:
+      - name: Configure Git for Windows
+        if: matrix.os == 'windows-latest'
+        run: git config --global core.longpaths true
+        shell: pwsh
       - uses: actions/checkout@v4
       - run: corepack enable
       - uses: actions/setup-node@v4.4.0
         with:
           node-version: '20.x'
           cache: 'pnpm'
+      - name: Environment dump
+        run: |
+          echo "OS: $(uname -a || echo Windows)"
+          echo "Node: $(node --version)"
+          echo "pnpm: $(pnpm --version)"
+          echo "FFmpeg: $(which ffmpeg || echo 'not in PATH')"
+        shell: bash
       - run: node --version
       - run: pnpm -v
       - run: pnpm install --frozen-lockfile
+      - run: node tools/check-toolchain.mjs
       - run: pnpm run build
       - run: pnpm run test:golden:byteequal
+      - run: node tools/check-goldens.mjs --resampler zoh
       - name: FFmpeg structural sanity
         run: pnpm run test:cli:ffmpeg
         continue-on-error: true
+      - name: Check file encodings (Ubuntu only)
+        if: matrix.os == 'ubuntu-latest'
+        run: node tools/detect-text-binary.mjs
       - run: pnpm run versions:print
         if: always()
-      - name: Collect golden artifacts
+      - name: Upload failure artifacts
         if: failure()
-        run: |
-          mkdir -p artifacts/goldens
-          cp -R goldens artifacts/goldens/expected
-          if [ -d out/goldens ]; then cp -R out/goldens artifacts/goldens/actual; fi
-          if [ -f out/versions.json ]; then cp out/versions.json artifacts/; fi
-        shell: bash
-      - uses: actions/upload-artifact@v4
-        if: failure()
+        uses: actions/upload-artifact@v4
         with:
-          name: golden-${{ matrix.label }}
-          path: artifacts
+          name: golden-failure-${{ matrix.label }}
+          path: |
+            out/versions.json
+            out/diff/**
+            out/goldens/**
