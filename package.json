@@ -17,7 +17,9 @@
     "test:golden:byteequal": "pnpm -r --filter ./packages/* --if-present run build && pnpm -r --filter ./apps/cli run build && node tools/run-golden-tests.mjs",
     "test:cli:ffmpeg": "pnpm -r --filter ./packages/* --if-present run build && pnpm -r --filter ./apps/cli run build && node tools/run-golden-tests.mjs --structure-only --resampler ffmpeg",
     "versions:print": "node tools/versions.mjs",
-    "goldens:regen": "node tools/regenerate-goldens.mjs"
+    "goldens:regen": "node tools/regenerate-goldens.mjs",
+    "publish:dry-run": "mkdir -p out/publish-dryruns && pnpm -r --filter ./apps/cli exec npm publish --dry-run > out/publish-dryruns/cli.txt 2>&1",
+    "publish:dryrun": "pnpm run publish:dry-run"
   },
   "devDependencies": {
     "@eslint/js": "9.11.0",
