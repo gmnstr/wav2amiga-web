@@ -2,6 +2,29 @@
 
 Thank you for your interest in contributing to wav2amiga-web! This document outlines the development workflow and guidelines.
 
+## Tiny Invariants Header
+
+**no golden changes**, **ZOH only**, **single npm package `wav2amiga`**, **reports opt‑in**, **CI must be green before reporting success**.
+
+## Request Micro-Structure
+
+When submitting issues or pull requests, please follow this structure:
+
+1. **Context**: Specify the file, lines, or module affected
+2. **Intent**: Describe the exact change you want to make
+3. **Constraints**: Note any invariants (no golden changes, determinism, etc.)
+4. **Validation**: List the commands to verify your changes work correctly
+
+## Requirements Contract Template
+
+For feature requests, please provide:
+
+- **Input**: What files/formats/parameters are needed
+- **Output**: What should be produced
+- **Determinism**: How it maintains byte-identical outputs
+- **Testing**: How to verify the feature works correctly
+- **Breaking Changes**: Whether this affects existing APIs
+
 ## Development Setup
 
 ```bash
@@ -51,6 +74,27 @@ Verifies file encodings and line endings:
 ```bash
 node tools/detect-text-binary.mjs
 ```
+
+## Running Examples
+
+The project includes reproducible examples in the `examples/` directory:
+
+```bash
+# Run a single example
+cd examples/single_c2_sine
+bash run.sh
+
+# Run all examples
+find examples -name run.sh -exec bash {} \;
+```
+
+Each example includes:
+- Input WAV files
+- Expected 8SVX output
+- SHA256 verification script
+- README with usage instructions
+
+Examples verify byte-identical output via SHA256 checksums and serve as integration tests.
 
 ## Golden Test Management
 
