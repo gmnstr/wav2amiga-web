@@ -110,8 +110,8 @@
                 <a href="https://github.com/gmnstr/wav2amiga-web/actions/workflows/ci.yml">
                     <img src="https://github.com/gmnstr/wav2amiga-web/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI">
                 </a>
-                <a href="https://www.npmjs.com/package/wav2amiga">
-                    <img src="https://img.shields.io/npm/v/wav2amiga" alt="npm">
+                <a href="https://github.com/gmnstr/wav2amiga-web">
+                    <img src="https://img.shields.io/badge/version-v0.1.0-blue" alt="Version">
                 </a>
             </div>
             <div class="cta">
@@ -141,10 +141,13 @@
 
         <div class="feature">
             <h3>Quick Start</h3>
-            <p>Install the CLI tool globally:</p>
-            <div class="code">npm install -g wav2amiga</div>
+            <p>Clone and build from source:</p>
+            <div class="code">git clone https://github.com/gmnstr/wav2amiga-web.git
+cd wav2amiga-web
+pnpm install
+pnpm build</div>
             <p>Convert a single sample:</p>
-            <div class="code">wav2amiga --mode single --note C-2 input.wav</div>
+            <div class="code">node apps/cli/dist/cli.js --mode single --note C-2 input.wav</div>
             <p>Or use the <a href="./app/">web interface</a> for drag-and-drop conversion.</p>
         </div>
 
