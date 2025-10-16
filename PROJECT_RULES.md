@@ -2,6 +2,8 @@
 
 This document outlines the key rules and invariants for the wav2amiga project.
 
+> 📚 **Comprehensive Documentation**: See [docs/README.md](docs/README.md) for complete guides, API reference, and development documentation.
+
 ## Tiny Invariants Header
 
 **no golden changes**, **ZOH only**, **single npm package `wav2amiga`**, **reports opt‑in**, **CI must be green before reporting success**.

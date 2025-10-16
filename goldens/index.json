@@ -1,14 +1,14 @@
 {
   "version": 2,
   "toolchain": {
-    "node": "v20.19.5",
+    "node": "v20.19.0",
     "pnpm": "9.10.0",
     "ffmpeg": "ffmpeg version 6.0 Copyright (c) 2000-2023 the FFmpeg developers\nbuilt with Apple clang version 13.1.6 (clang-1316.0.21.2.5)\nconfiguration: --prefix=/Volumes/tempdisk/sw --extra-cflags=-fno-stack-check --arch=arm64 --cc=/usr/bin/clang --enable-gpl --enable-libvmaf --enable-libbluray --enable-libopenjpeg --enable-libopus --enable-libmp3lame --enable-libx264 --enable-libx265 --enable-libvpx --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libtheora --enable-libvorbis --enable-libsnappy --enable-libaom --enable-libvidstab --enable-libzimg --enable-libsvtav1 --enable-libkvazaar --enable-version3 --pkg-config-flags=--static --enable-ffplay --enable-postproc --enable-nonfree --enable-neon --enable-runtime-cpudetect --disable-indev=qtkit --disable-indev=x11grab_xcb\nlibavutil      58.  2.100 / 58.  2.100\nlibavcodec     60.  3.100 / 60.  3.100\nlibavformat    60.  3.100 / 60.  3.100\nlibavdevice    60.  1.100 / 60.  1.100\nlibavfilter     9.  3.100 /  9.  3.100\nlibswscale      7.  1.100 /  7.  1.100\nlibswresample   4. 10.100 /  4. 10.100\nlibpostproc    57.  1.100 / 57.  1.100",
     "resampler": {
       "name": "zoh",
       "version": "1.0.0"
     },
-    "git": "934ff5ae44a7cc7b931ad6d50fb8fc1ff5b69358"
+    "git": "6890d098bf461bab0acd93b5e5639818add81a1f"
   },
   "cases": [
     {
@@ -28,7 +28,7 @@
         },
         "report": {
           "path": "cases/single_c2_sine/output_report.json",
-          "sha256": "4d8b0a5c427a06c03da6689380eede40a696293a2b802f7ce088da7a1e653a9c"
+          "sha256": "489bc5bb05cf16f66e4762ebd3f236d802dd6a1170eabb949b0e3a45d3e34255"
         }
       }
     },
@@ -57,7 +57,7 @@
         },
         "report": {
           "path": "cases/stacked_offsets/output_00_05_09_report.json",
-          "sha256": "db1d1d368b0e11a51e7de49492af89b9e104a50446c92c32afaef250af853e86"
+          "sha256": "41371134b3b1388fdf26b36d14eed096dbb0953f7ce31040b84537e2d5d79b60"
         }
       }
     },
@@ -86,7 +86,7 @@
         },
         "report": {
           "path": "cases/stackedequal_uniform/output_05_report.json",
-          "sha256": "d806ec80c0ae60331f2dadc8bdbb6bbd2f354d66353858742e1b9ade54f2d3a3"
+          "sha256": "90e8144a1d1fdd523f6e5f993e21919ad5da65d77357906f270f5adffe04d2df"
         }
       }
     },
@@ -107,7 +107,7 @@
         },
         "report": {
           "path": "cases/aligned_boundary/output_report.json",
-          "sha256": "9c893e16cd706c4b79c1e852b88ea594cdd2519e3382c63e1e875ccb196ee587"
+          "sha256": "2d93f9a424fd130c13750f2572a3584d0ff42690dc6642054324227493c2c0b1"
         }
       }
     },
@@ -128,7 +128,7 @@
         },
         "report": {
           "path": "cases/oversize_warning/output_report.json",
-          "sha256": "06102869415459cfc161a7dccc9dd484687f704d89fcd1f31d4e44e331b9623c"
+          "sha256": "0102d8c8cb73380c5c710ed8175384f12a9862779f85972fd2424dabc831377a"
         },
         "warnings": [
           "input is 84859 bytes (> 65535). ProTracker may not load the full sample."
@@ -152,7 +152,7 @@
         },
         "report": {
           "path": "cases/silence_minimal/output_report.json",
-          "sha256": "628c24a800a2118e6c5bac4877dafad45090723feb7c10494d35a1fb1edb5e5a"
+          "sha256": "cd8a72c15e577b7f916ad8d6012c0e060128d0754ba9eb92bf09b306096a0707"
         }
       }
     }

@@ -3,6 +3,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { execSync } from "node:child_process";
+import { OUT_DIR } from "./lib/paths.mjs";
 let getFfmpegVersion;
 try {
   ({ getFfmpegVersion } = await import("../packages/node-io/dist/index.js"));
@@ -87,7 +88,7 @@ async function main() {
   console.log(`Git commit: ${versions.git}`);
 
   // Write to out/versions.json
-  const outDir = path.join(process.cwd(), "out");
+  const outDir = path.join(process.cwd(), OUT_DIR);
   if (!fs.existsSync(outDir)) {
     fs.mkdirSync(outDir, { recursive: true });
   }

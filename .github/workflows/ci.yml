@@ -259,38 +259,39 @@ jobs:
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-  pages-deploy:
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    steps:
-      - uses: actions/checkout@v4
-      - run: corepack enable
-      - uses: actions/setup-node@v4.4.0
-        with:
-          node-version: '20.x'
-          cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm run build
-      - name: Build web app
-        run: |
-          cd apps/web
-          pnpm run build
-      - name: Prepare website
-        run: |
-          # Create website/app directory
-          mkdir -p website/app
-          # Copy web app dist to website/app
-          cp -r apps/web/dist/* website/app/
-          # Ensure .nojekyll exists
-          touch website/.nojekyll
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: website
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+  # pages-deploy: Disabled - using /docs hosting instead
+  # pages-deploy:
+  #   if: github.ref == 'refs/heads/main'
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #     contents: read
+  #     pages: write
+  #     id-token: write
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - run: corepack enable
+  #     - uses: actions/setup-node@v4.4.0
+  #       with:
+  #         node-version: '20.x'
+  #         cache: 'pnpm'
+  #     - run: pnpm install --frozen-lockfile
+  #     - run: pnpm run build
+  #     - name: Build web app
+  #       run: |
+  #         cd apps/web
+  #         pnpm run build
+  #     - name: Prepare website
+  #       run: |
+  #         # Create website/app directory
+  #         mkdir -p website/app
+  #         # Copy web app dist to website/app
+  #         cp -r apps/web/dist/* website/app/
+  #         # Ensure .nojekyll exists
+  #         touch website/.nojekyll
+  #     - name: Upload Pages artifact
+  #       uses: actions/upload-pages-artifact@v3
+  #       with:
+  #         path: website
+  #     - name: Deploy to GitHub Pages
+  #       id: deployment
+  #       uses: actions/deploy-pages@v4

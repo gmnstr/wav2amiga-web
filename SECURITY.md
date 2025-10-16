@@ -12,14 +12,7 @@ currently being supported with security updates.
 
 ## Reporting a Vulnerability
 
-Please report security vulnerabilities to the project maintainers through private channels rather than public issues.
+Please use **GitHub Security Advisories** for private disclosure:
+https://github.com/gmnstr/wav2amiga-web/security/advisories/new
 
-For security issues, please email: [security@wav2amiga.dev](mailto:security@wav2amiga.dev)
-
-Include the following information:
-- Description of the vulnerability
-- Steps to reproduce
-- Potential impact
-- Suggested fix (if any)
-
-We will respond to security reports within 48 hours and provide updates on the resolution timeline.
+We'll acknowledge within 5 business days and coordinate a fix + release.

@@ -5,11 +5,12 @@ import * as path from "node:path";
 import * as crypto from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { getVersions } from "./versions.mjs";
+import { OUT_DIR } from "./lib/paths.mjs";
 
 const repoRoot = process.cwd();
 const goldensDir = path.join(repoRoot, "goldens");
 const indexPath = path.join(goldensDir, "index.json");
-const tmpOutputRoot = path.join(repoRoot, "out", "goldens-regenerate");
+const tmpOutputRoot = path.join(repoRoot, OUT_DIR, "goldens-regenerate");
 
 function parseArgs() {
   const args = process.argv.slice(2);

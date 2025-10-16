@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
-  base: "/",
+  base: "/wav2amiga-web/app/",
   build: {
     outDir: "dist",
     assetsDir: "assets",

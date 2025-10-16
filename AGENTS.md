@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-This pnpm workspace keeps runtime code in `packages/` and entrypoints in `apps/`. Place reusable conversion logic in `packages/core`, resampling engines in `packages/resampler-zoh` or `packages/resampler-wasm`, and FFmpeg-backed helpers in `packages/node-io`. The CLI and web UI live in `apps/cli` and `apps/web`; their compiled assets land in per-package `dist/` folders and the workspace-level `out/`. Golden reference outputs sit in `goldens/`, WAV fixtures in `testdata/`, and shared automation (e.g. `tools/run-golden-tests.mjs`, `create-test-wav.mjs`) in `tools/`.
+This pnpm workspace keeps runtime code in `packages/` and entrypoints in `apps/`. Place reusable conversion logic in `packages/core`, resampling engines in `packages/resampler-zoh` or `packages/resampler-wasm`, and FFmpeg-backed helpers in `packages/node-io`. The CLI and web UI live in `apps/cli` and `apps/web`; their compiled assets land in per-package `dist/` folders and the workspace-level `out/`. Golden reference outputs sit in `goldens/`, WAV fixtures in `testdata/`, and shared automation (e.g. `tools/run-golden-tests.mjs`, `tools/create-test-wav.mjs`) in `tools/`.
 
 ## Build, Test & Development Commands
 - `pnpm install` aligns your workspace with Node 20.17.0/PNPM 9.10.0 (Volta pins these versions).

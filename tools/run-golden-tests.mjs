@@ -4,6 +4,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as crypto from "node:crypto";
 import { spawnSync } from "node:child_process";
+import { OUT_DIR } from "./lib/paths.mjs";
 
 const BYTES_CONTEXT = 32; // 32 bytes on each side => 64 byte window
 
@@ -207,7 +208,7 @@ async function runGoldenTests(structureOnly, resampler) {
 
   let failedCases = 0;
   let passedCases = 0;
-  const perCaseOutputDir = path.join(repoRoot, "out", "goldens");
+  const perCaseOutputDir = path.join(repoRoot, OUT_DIR, "goldens");
   ensureDir(perCaseOutputDir);
 
   for (const caseInfo of index.cases) {

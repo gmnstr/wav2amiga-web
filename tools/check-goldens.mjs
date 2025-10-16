@@ -4,6 +4,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as crypto from "node:crypto";
 import { spawnSync } from "node:child_process";
+import { OUT_DIR, OUT_DIFF } from "./lib/paths.mjs";
 
 const BYTES_CONTEXT = 32; // 32 bytes on each side => 64 byte window
 
@@ -130,7 +131,7 @@ function runCli(commandArgs, cwd) {
 }
 
 function writeHexdumpDiff(caseId, filename, expectedBuffer, actualBuffer, diff) {
-  const diffDir = path.join(process.cwd(), "out", "diff");
+  const diffDir = path.join(process.cwd(), OUT_DIFF);
   ensureDir(diffDir);
   
   const diffPath = path.join(diffDir, `${caseId}-${filename}.txt`);
@@ -176,7 +177,7 @@ async function checkGoldenDrift(resampler) {
 
   let failedCases = 0;
   let passedCases = 0;
-  const perCaseOutputDir = path.join(repoRoot, "out", "golden-drift");
+  const perCaseOutputDir = path.join(repoRoot, OUT_DIR, "golden-drift");
   ensureDir(perCaseOutputDir);
 
   for (const caseInfo of index.cases) {
