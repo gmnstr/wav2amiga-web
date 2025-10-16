@@ -8,6 +8,11 @@ import * as fs from "node:fs";
  * @returns Promise<Int16Array> Raw PCM16 data (16-bit signed integers, little-endian)
  */
 export async function decodeToPcm16(filePath: string): Promise<Int16Array> {
+  // Check file exists first
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`${filePath}: file not found`);
+  }
+
   try {
     // Use ffmpeg to decode WAV to raw PCM16
     // -i <file> -ac 1 -f s16le -
@@ -46,6 +51,11 @@ export async function decodeAndResampleToPcm16(
   filePath: string,
   targetHz: number
 ): Promise<Int16Array> {
+  // Check file exists first
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`${filePath}: file not found`);
+  }
+
   try {
     // Use ffmpeg to decode, convert to mono, resample, and output raw PCM16
     // Note: soxr resampler not available in static builds, using default resampler
@@ -85,6 +95,11 @@ export async function decodeAndResampleToPcm16(
  * @returns Promise<{ data: Int16Array; srcHz: number }> PCM16 data and source sample rate
  */
 export async function decodePCM16Mono(filePath: string): Promise<{ data: Int16Array; srcHz: number }> {
+  // Check file exists first
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`${filePath}: file not found`);
+  }
+
   try {
     // Use ffmpeg to decode WAV to WAV format (preserves header)
     // -f wav -ac 1 ensures mono WAV output

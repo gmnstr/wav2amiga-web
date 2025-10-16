@@ -4,12 +4,12 @@
  */
 
 export interface ResamplerMeta {
-  name: 'wasm' | 'ffmpeg';
+  name: 'wasm' | 'ffmpeg' | 'zoh';
   version: string;
   sha256?: string;
 }
 
 export interface ResampleAPI {
   meta: ResamplerMeta;
-  resamplePCM16(input: Int16Array, srcHz: number, dstHz: number): Int16Array;
+  resamplePCM16(_input: Int16Array, _srcHz: number, _dstHz: number): Int16Array;
 }

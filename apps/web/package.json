@@ -5,14 +5,31 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview --strictPort"
+    "preview": "vite preview --strictPort",
+    "test": "vitest",
+    "test:run": "vitest run"
   },
   "dependencies": {
     "@wav2amiga/core": "workspace:*",
-    "@wav2amiga/resampler-wasm": "workspace:*"
+    "@wav2amiga/resampler-wasm": "workspace:*",
+    "@wav2amiga/resampler-zoh": "workspace:*",
+    "lucide-react": "^0.545.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.14",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "@vitejs/plugin-react": "^5.0.4",
+    "autoprefixer": "^10.4.21",
+    "jsdom": "^27.0.0",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.14",
+    "typescript": "5.6.3",
     "vite": "5.4.8",
-    "typescript": "5.6.3"
+    "vitest": "^3.2.4"
   }
 }

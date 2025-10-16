@@ -1,28 +1,158 @@
 {
-  "version": 1,
+  "version": 2,
   "toolchain": {
-    "node": "20.17.0",
+    "node": "v20.19.0",
     "pnpm": "9.10.0",
-    "ffmpeg": "unknown",
-    "wasm": {
-      "package": "libsamplerate-wasm@0.2.0",
-      "sha256": "placeholder"
-    }
+    "ffmpeg": "ffmpeg version 6.0 Copyright (c) 2000-2023 the FFmpeg developers\nbuilt with Apple clang version 13.1.6 (clang-1316.0.21.2.5)\nconfiguration: --prefix=/Volumes/tempdisk/sw --extra-cflags=-fno-stack-check --arch=arm64 --cc=/usr/bin/clang --enable-gpl --enable-libvmaf --enable-libbluray --enable-libopenjpeg --enable-libopus --enable-libmp3lame --enable-libx264 --enable-libx265 --enable-libvpx --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libtheora --enable-libvorbis --enable-libsnappy --enable-libaom --enable-libvidstab --enable-libzimg --enable-libsvtav1 --enable-libkvazaar --enable-version3 --pkg-config-flags=--static --enable-ffplay --enable-postproc --enable-nonfree --enable-neon --enable-runtime-cpudetect --disable-indev=qtkit --disable-indev=x11grab_xcb\nlibavutil      58.  2.100 / 58.  2.100\nlibavcodec     60.  3.100 / 60.  3.100\nlibavformat    60.  3.100 / 60.  3.100\nlibavdevice    60.  1.100 / 60.  1.100\nlibavfilter     9.  3.100 /  9.  3.100\nlibswscale      7.  1.100 /  7.  1.100\nlibswresample   4. 10.100 /  4. 10.100\nlibpostproc    57.  1.100 / 57.  1.100",
+    "resampler": {
+      "name": "zoh",
+      "version": "1.0.0"
+    },
+    "git": "52588a57bf17f553eeff744c7d95de352181e76a"
   },
   "cases": [
     {
       "id": "single_c2_sine",
       "mode": "single",
       "note": "C-2",
-      "inputs": ["cases/single_c2_sine/input.wav"],
+      "inputs": [
+        {
+          "path": "cases/single_c2_sine/input.wav",
+          "sha256": "939ff6ec35e1e5e54f565772efa630d165a2eda368abdbef020272ba4179bb5d"
+        }
+      ],
       "expect": {
         "output": {
           "path": "cases/single_c2_sine/output.8SVX",
-          "sha256": "placeholder"
+          "sha256": "a19dc46d2a4399f0ac48901a3dfe8e93dc160b780668526738d0eaba80af7add"
         },
         "report": {
-          "path": "cases/single_c2_sine/report.json",
-          "sha256": "placeholder"
+          "path": "cases/single_c2_sine/output_report.json",
+          "sha256": "489bc5bb05cf16f66e4762ebd3f236d802dd6a1170eabb949b0e3a45d3e34255"
+        }
+      }
+    },
+    {
+      "id": "stacked_offsets",
+      "mode": "stacked",
+      "manifest": "cases/stacked_offsets/manifest.json",
+      "inputs": [
+        {
+          "path": "cases/stacked_offsets/input_a.wav",
+          "sha256": "40b1a6a0f51a59bd43cf8f04ef4037fc552094058ad6865d9ade5629d3b2a289"
+        },
+        {
+          "path": "cases/stacked_offsets/input_b.wav",
+          "sha256": "a0212ca6c8f754072c98e2b0b05d01d42cf7dc2dad5da32be29d9abb2c419271"
+        },
+        {
+          "path": "cases/stacked_offsets/input_c.wav",
+          "sha256": "4e4b51ef630d3a6c989a257eaea581d20a1e11300ae73354557a9bc217cb85d2"
+        }
+      ],
+      "expect": {
+        "output": {
+          "path": "cases/stacked_offsets/output_00_05_09.8SVX",
+          "sha256": "ab1407b4a05d1b8478ad29c30cd4dc13921bb66dcdd82bcc6f1ddedc27587dfb"
+        },
+        "report": {
+          "path": "cases/stacked_offsets/output_00_05_09_report.json",
+          "sha256": "41371134b3b1388fdf26b36d14eed096dbb0953f7ce31040b84537e2d5d79b60"
+        }
+      }
+    },
+    {
+      "id": "stackedequal_uniform",
+      "mode": "stacked-equal",
+      "manifest": "cases/stackedequal_uniform/manifest.json",
+      "inputs": [
+        {
+          "path": "cases/stackedequal_uniform/input_a.wav",
+          "sha256": "28645d7b0b4d9cb50fce9dd9b7ad9b20fbc8077aae79635964824de7334bfeb3"
+        },
+        {
+          "path": "cases/stackedequal_uniform/input_b.wav",
+          "sha256": "ef7832de4f3fcbfa44bdacb70e4364f925684d5c5ef02f465e09e256936cb8cb"
+        },
+        {
+          "path": "cases/stackedequal_uniform/input_c.wav",
+          "sha256": "bef157bd326762b4cd443d5a1ca38e3a8cedcaa2f526610b61c34022657c1c2f"
+        }
+      ],
+      "expect": {
+        "output": {
+          "path": "cases/stackedequal_uniform/output_05.8SVX",
+          "sha256": "e52ac7d2832f72988cbf6a0dbcffe9ad9d99aacd5f7189958bd214145a9fd8a1"
+        },
+        "report": {
+          "path": "cases/stackedequal_uniform/output_05_report.json",
+          "sha256": "90e8144a1d1fdd523f6e5f993e21919ad5da65d77357906f270f5adffe04d2df"
+        }
+      }
+    },
+    {
+      "id": "aligned_boundary",
+      "mode": "single",
+      "note": "C-2",
+      "inputs": [
+        {
+          "path": "cases/aligned_boundary/input.wav",
+          "sha256": "b735f4f94f483526a389d6f46b776e7c0f36be0c691e89ef0292480405d0dbc4"
+        }
+      ],
+      "expect": {
+        "output": {
+          "path": "cases/aligned_boundary/output.8SVX",
+          "sha256": "fdf53622292eab662f6a30ae977d31dc2c59d63794b29d0fbaf337b42c500075"
+        },
+        "report": {
+          "path": "cases/aligned_boundary/output_report.json",
+          "sha256": "2d93f9a424fd130c13750f2572a3584d0ff42690dc6642054324227493c2c0b1"
+        }
+      }
+    },
+    {
+      "id": "oversize_warning",
+      "mode": "single",
+      "note": "C-2",
+      "inputs": [
+        {
+          "path": "cases/oversize_warning/input.wav",
+          "sha256": "655324ecd4cfdf3ec6deb321e770b009664a286ba046624a3b0b96cb73c21b61"
+        }
+      ],
+      "expect": {
+        "output": {
+          "path": "cases/oversize_warning/output.8SVX",
+          "sha256": "1ef6b90824006a7bb31b91f4c49947419c354f7add0ecc1072d72d58d43d8add"
+        },
+        "report": {
+          "path": "cases/oversize_warning/output_report.json",
+          "sha256": "0102d8c8cb73380c5c710ed8175384f12a9862779f85972fd2424dabc831377a"
+        },
+        "warnings": [
+          "input is 84859 bytes (> 65535). ProTracker may not load the full sample."
+        ]
+      }
+    },
+    {
+      "id": "silence_minimal",
+      "mode": "single",
+      "note": "C-2",
+      "inputs": [
+        {
+          "path": "cases/silence_minimal/input.wav",
+          "sha256": "150d4cf6b3e2881722fb410df56f7f48da4ec61ab606a487e1e0b14a48239db0"
+        }
+      ],
+      "expect": {
+        "output": {
+          "path": "cases/silence_minimal/output.8SVX",
+          "sha256": "bde940f1f1a59f2b3489f191367a0ac65ec32a58e4bef104fac83a578b0f8867"
+        },
+        "report": {
+          "path": "cases/silence_minimal/output_report.json",
+          "sha256": "cd8a72c15e577b7f916ad8d6012c0e060128d0754ba9eb92bf09b306096a0707"
         }
       }
     }

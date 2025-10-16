@@ -1,9 +1,12 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { ResampleAPI, ResamplerMeta } from "../resampler.js";
 
 // Mock WASM resampler for testing
 class MockWasmResampler implements ResampleAPI {
-  constructor(public meta: ResamplerMeta) {}
+  // eslint-disable-next-line no-unused-vars
+  constructor(public meta: ResamplerMeta) {
+    // meta is used as a public property
+  }
 
   resamplePCM16(input: Int16Array, srcHz: number, dstHz: number): Int16Array {
     if (srcHz === dstHz) return input.slice();

@@ -4,16 +4,19 @@
   "type": "module",
   "bin": { "wav2amiga": "dist/cli.js" },
   "scripts": {
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run"
   },
   "dependencies": {
     "yargs": "17.7.2",
     "@wav2amiga/core": "workspace:*",
     "@wav2amiga/node-io": "workspace:*",
-    "@wav2amiga/resampler-wasm": "workspace:*"
+    "@wav2amiga/resampler-wasm": "workspace:*",
+    "@wav2amiga/resampler-zoh": "workspace:*"
   },
   "devDependencies": {
     "@types/yargs": "17.0.33",
-    "typescript": "5.6.3"
+    "typescript": "5.6.3",
+    "vitest": "2.0.5"
   }
 }

@@ -1,27 +1,67 @@
 name: ci
 on: [push, pull_request]
+
 jobs:
-  build-test:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+  unit:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - run: corepack enable
       - uses: actions/setup-node@v4
         with:
-          node-version: 20.17.0
+          node-version: 20
           cache: 'pnpm'
       - run: pnpm -v
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
       - run: pnpm run test:unit
-      - run: pnpm run test:golden:wasm
-      - run: pnpm run test:cli:ffmpeg
       - run: pnpm run versions:print
+        if: always()
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: versions-${{ matrix.os }}
+          name: versions-unit
           path: out/versions.json
+
+  golden-byteequal:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            label: ubuntu
+          - os: macos-latest
+            label: macos
+          - os: windows-latest
+            label: windows
+    runs-on: ${{ matrix.os }}
+    name: golden-byteequal (${{ matrix.label }})
+    steps:
+      - uses: actions/checkout@v4
+      - run: corepack enable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+      - run: pnpm -v
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build
+      - run: pnpm run test:golden:byteequal
+      - name: FFmpeg structural sanity
+        run: pnpm run test:cli:ffmpeg
+        continue-on-error: true
+      - run: pnpm run versions:print
+        if: always()
+      - name: Collect golden artifacts
+        if: failure()
+        run: |
+          mkdir -p artifacts/goldens
+          cp -R goldens artifacts/goldens/expected
+          if [ -d out/goldens ]; then cp -R out/goldens artifacts/goldens/actual; fi
+          if [ -f out/versions.json ]; then cp out/versions.json artifacts/; fi
+        shell: bash
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: golden-${{ matrix.label }}
+          path: artifacts

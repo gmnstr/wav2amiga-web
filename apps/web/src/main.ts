@@ -1,5 +1,5 @@
 import { noteToTargetHz, ResampleAPI, mapPcm16To8Bit } from "@wav2amiga/core";
-import { createWasmResampler } from "@wav2amiga/resampler-wasm";
+import { createZohResampler } from "@wav2amiga/resampler-zoh";
 
 // DOM elements
 const dropZone = document.getElementById("dropZone")!;
@@ -14,16 +14,16 @@ const previewBanner = document.getElementById("previewBanner")!;
 // State
 let currentAudioBuffer: AudioBuffer | null = null;
 let convertedData: Uint8Array | null = null;
-let wasmResampler: ResampleAPI | null = null;
+let zohResampler: ResampleAPI | null = null;
 let usingPreviewQuality = false;
 
-// Initialize WASM resampler on startup
+// Initialize ZOH resampler on startup
 async function initializeResampler() {
   try {
-    wasmResampler = await createWasmResampler();
-    console.log("WASM resampler initialized successfully");
+    zohResampler = createZohResampler();
+    console.log("ZOH resampler initialized successfully");
   } catch (error) {
-    console.warn("WASM resampler not available, using preview quality:", error);
+    console.warn("ZOH resampler failed, using preview quality:", error);
     usingPreviewQuality = true;
     previewBanner.style.display = "block";
   }
@@ -210,10 +210,10 @@ convertBtn.addEventListener("click", async () => {
 
     if (srcHz === targetHz) {
       resampledPcm16 = pcm16;
-    } else if (wasmResampler && !usingPreviewQuality) {
-      // Use WASM resampler for high quality
-      resampledPcm16 = wasmResampler.resamplePCM16(pcm16, srcHz, targetHz);
-      output.textContent += `Resampled from ${srcHz}Hz to ${targetHz}Hz using WASM resampler\n`;
+    } else if (zohResampler && !usingPreviewQuality) {
+      // Use ZOH resampler for high quality
+      resampledPcm16 = zohResampler.resamplePCM16(pcm16, srcHz, targetHz);
+      output.textContent += `Resampled from ${srcHz}Hz to ${targetHz}Hz using ZOH resampler\n`;
     } else {
       // Fallback to OfflineAudioContext for preview quality
       resampledPcm16 = await resampleWithOfflineAudioContext(pcm16, srcHz, targetHz);
@@ -368,9 +368,9 @@ async function init() {
   await initializeResampler();
   output.textContent = "Ready to convert WAV files to 8SVX format.\n";
   if (usingPreviewQuality) {
-    output.textContent += "Note: Using preview quality resampling. For best results, ensure libsamplerate-wasm is available.\n";
+    output.textContent += "Note: Using preview quality resampling. For best results, ensure ZOH resampler is available.\n";
   } else {
-    output.textContent += "Note: Using high-quality WASM resampling.\n";
+    output.textContent += "Note: Using high-quality ZOH resampling (preserves transients).\n";
   }
 }
 

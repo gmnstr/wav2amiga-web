@@ -19,9 +19,8 @@ export async function getVersions() {
     pnpm: "unknown",
     ffmpeg: "unknown",
     resampler: {
-      name: "wasm",
-      version: "unknown",
-      sha256: "unknown"
+      name: "zoh",
+      version: "unknown"
     },
     git: "unknown",
   };
@@ -45,17 +44,16 @@ export async function getVersions() {
     }
 
     // Get resampler metadata
-    const versionJsonPath = path.join(process.cwd(), "packages", "resampler-wasm", "VERSION.json");
-    if (fs.existsSync(versionJsonPath)) {
+    const zohPackagePath = path.join(process.cwd(), "packages", "resampler-zoh", "package.json");
+    if (fs.existsSync(zohPackagePath)) {
       try {
-        const versionInfo = JSON.parse(fs.readFileSync(versionJsonPath, "utf-8"));
+        const pkg = JSON.parse(fs.readFileSync(zohPackagePath, "utf-8"));
         versions.resampler = {
-          name: "wasm",
-          version: versionInfo.version || "unknown",
-          sha256: versionInfo.sha256 || "unknown"
+          name: "zoh",
+          version: pkg.version || "unknown"
         };
       } catch (error) {
-        console.warn("Could not read VERSION.json:", error.message);
+        console.warn("Could not read resampler-zoh package.json:", error.message);
       }
     }
 
@@ -85,7 +83,7 @@ async function main() {
   console.log(`Node.js: ${versions.node}`);
   console.log(`pnpm: ${versions.pnpm}`);
   console.log(`FFmpeg: ${versions.ffmpeg.split('\n')[0] || 'unknown'}`);
-  console.log(`Resampler: ${versions.resampler.name}@${versions.resampler.version} (${versions.resampler.sha256})`);
+  console.log(`Resampler: ${versions.resampler.name}@${versions.resampler.version}`);
   console.log(`Git commit: ${versions.git}`);
 
   // Write to out/versions.json
