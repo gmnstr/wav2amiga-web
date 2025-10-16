@@ -114,7 +114,7 @@ jobs:
       - run: pnpm run build
       - name: Run contract tests
         run: |
-          cd packages/core && pnpm exec vitest run ../../tools/__tests__/contracts.test.ts
+          cd packages/core && pnpm exec vitest run src/__tests__/contracts.test.ts
           cd ../../apps/cli && pnpm exec vitest run src/__tests__/contracts.test.ts
 
   docs-and-examples:
