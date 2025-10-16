@@ -8,6 +8,21 @@ import { OUT_DIR, OUT_DIFF } from "./lib/paths.mjs";
 
 const BYTES_CONTEXT = 32; // 32 bytes on each side => 64 byte window
 
+function stableSort(value) {
+  if (Array.isArray(value)) {
+    return value.map(stableSort);
+  }
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value)
+      .sort(([a], [b]) => a.localeCompare(b));
+    return entries.reduce((acc, [key, val]) => {
+      acc[key] = stableSort(val);
+      return acc;
+    }, {});
+  }
+  return value;
+}
+
 function formatHex(buffer) {
   return Array.from(buffer)
     .map((byte) => byte.toString(16).toUpperCase().padStart(2, "0"))
@@ -326,8 +341,12 @@ async function checkGoldenDrift(resampler) {
         console.error(`❌ Expected report missing: ${expectedReportPath}`);
         caseFailed = true;
       } else {
+        // Calculate SHA of report without versions section to match golden test logic
+        const actualReportContent = JSON.parse(fs.readFileSync(actualReportPath, "utf-8"));
+        const actualReportForSha = { ...actualReportContent };
+        delete actualReportForSha.versions;
         const actualReportSha = crypto.createHash("sha256")
-          .update(fs.readFileSync(actualReportPath))
+          .update(JSON.stringify(stableSort(actualReportForSha)))
           .digest("hex");
 
         if (!expectedReport.sha256) {
