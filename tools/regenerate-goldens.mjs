@@ -69,6 +69,21 @@ function loadIndex() {
   }
 }
 
+function stableSort(value) {
+  if (Array.isArray(value)) {
+    return value.map(stableSort);
+  }
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value)
+      .sort(([a], [b]) => a.localeCompare(b));
+    return entries.reduce((acc, [key, val]) => {
+      acc[key] = stableSort(val);
+      return acc;
+    }, {});
+  }
+  return value;
+}
+
 function normalizeVersion(value) {
   return (value ?? "").toString().replace(/^v/, "");
 }
@@ -178,6 +193,17 @@ function updateInputShas(caseInfo) {
 function copyAndHash(source, destination) {
   ensureDir(path.dirname(destination));
   fs.copyFileSync(source, destination);
+  
+  // For report files, compute SHA without versions section to match golden test logic
+  if (destination.endsWith('_report.json')) {
+    const reportContent = JSON.parse(fs.readFileSync(destination, "utf-8"));
+    const reportForSha = { ...reportContent };
+    delete reportForSha.versions;
+    return crypto.createHash("sha256")
+      .update(JSON.stringify(stableSort(reportForSha)))
+      .digest("hex");
+  }
+  
   return computeSha256(destination);
 }
 
