@@ -119,6 +119,8 @@ jobs:
 
   docs-and-examples:
     runs-on: ubuntu-latest
+    env:
+      W2A_OUT_DIR: out
     steps:
       - uses: actions/checkout@v4
       - run: corepack enable
@@ -161,6 +163,28 @@ jobs:
         with:
           name: publish-dryrun
           path: out/publish-dryruns/**
+      - name: Verify /docs assets exist
+        run: |
+          test -f docs/index.html
+          test -f docs/app/index.html
+          grep -q 'href="\./app/' docs/index.html
+          test -f docs/.nojekyll
+      - name: Summarize OUT_DIR contents
+        if: always()
+        run: |
+          echo "OUT_DIR=$W2A_OUT_DIR"
+          mkdir -p "$W2A_OUT_DIR"
+          find "$W2A_OUT_DIR" -maxdepth 2 -type f -print || true
+      - name: Upload diagnostic artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagnostics
+          path: |
+            ${{ env.W2A_OUT_DIR }}/versions.json
+            ${{ env.W2A_OUT_DIR }}/diff/**
+            ${{ env.W2A_OUT_DIR }}/pkg/**
+          if-no-files-found: ignore
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
