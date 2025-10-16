@@ -29,6 +29,8 @@ interface ConversionResult {
     startOffsetHex: string;
     lengthBytes: number;
     paddedLengthBytes: number;
+    paddedLength: number;
+    sampleData: { [key: string]: number };
   }>;
   increment?: string;
   resampler: string;

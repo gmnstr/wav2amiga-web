@@ -43,6 +43,7 @@ export interface ResultMsg {
       lengthBytes: number;
       paddedLengthBytes: number;
       paddedLength: number;
+      sampleData: { [key: string]: number };
     }>;
     resampler: {
       name: string;
@@ -170,6 +171,12 @@ function processFile(
     // Fill padding with 0x80 (128) to match CLI
     alignedData.fill(0x80, sampleData8bit.length);
   
+  // Convert sampleData to the format expected by CLI reports
+  const sampleDataObj: { [key: string]: number } = {};
+  for (let i = 0; i < sampleData8bit.length; i++) {
+    sampleDataObj[i.toString()] = sampleData8bit[i];
+  }
+
   return {
     sampleData: alignedData,
     targetHz,
@@ -179,7 +186,8 @@ function processFile(
       targetHz,
       lengthBytes: sampleData8bit.length,
       paddedLengthBytes: alignedLength,
-      paddedLength: alignedLength
+      paddedLength: alignedLength,
+      sampleData: sampleDataObj
     }
   };
 }
