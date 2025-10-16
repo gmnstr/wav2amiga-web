@@ -8,7 +8,7 @@
       "name": "zoh",
       "version": "1.0.0"
     },
-    "git": "273b33d2f93e4dc9f64a0febe10120aab8488e72"
+    "git": "6ec8fda251b54446751295f1235d26851da6a2ce"
   },
   "cases": [
     {
@@ -28,7 +28,7 @@
         },
         "report": {
           "path": "cases/single_c2_sine/output_report.json",
-          "sha256": "085bf1cf1b3c53092645a1e67c37a60f739cd2bb101000876bc8d53453d17868"
+          "sha256": "76792a3592a1c48873808538956c27a3789872378b13bf7a096dafcf20c00094"
         }
       }
     },
@@ -57,7 +57,7 @@
         },
         "report": {
           "path": "cases/stacked_offsets/output_00_05_09_report.json",
-          "sha256": "d2621216ee73f182d512e30ef1853cf0db790c2a97e28b6b33bb54cc71722620"
+          "sha256": "9c1dd19589488d6b1e40bc63c398efd57cb26f5783c33994e5e0589fdf009955"
         }
       }
     },
@@ -86,7 +86,7 @@
         },
         "report": {
           "path": "cases/stackedequal_uniform/output_05_report.json",
-          "sha256": "5d1f796778e3c0ffa78f49d76d00f230b649a903f56a4906f11d395fe5662464"
+          "sha256": "41650761622d69deb2f04f37ee4eb56f61b2bd317e1f4ed99dfa71063dc9da86"
         }
       }
     },
@@ -107,7 +107,7 @@
         },
         "report": {
           "path": "cases/aligned_boundary/output_report.json",
-          "sha256": "1cd467f4afe0f5eeaef459c1a15d47eb2e8178e301d619b34f14ab25f43c986d"
+          "sha256": "852d854f6325d77110e8d300bc569f2aad8c9a7d97d1b2ed93aae0ba91397103"
         }
       }
     },
@@ -128,7 +128,7 @@
         },
         "report": {
           "path": "cases/oversize_warning/output_report.json",
-          "sha256": "dc354cfd887717806b178ec92e9183c2b05386aa9f121c86303a312872f287b3"
+          "sha256": "b7033a6c6c391fefcf174e827079bfe31858fb1f7805843a838ecf26cef845f8"
         },
         "warnings": [
           "input is 84859 bytes (> 65535). ProTracker may not load the full sample."
@@ -152,7 +152,7 @@
         },
         "report": {
           "path": "cases/silence_minimal/output_report.json",
-          "sha256": "523cb29c72a5d2320b04420e2493e54a7fbe27ea0fea8a1a823eaa952b4b048a"
+          "sha256": "e5f21d10e1a6d960439e3cdec7e09d23f5b5000e264da66932b5078aca17109d"
         }
       }
     }
