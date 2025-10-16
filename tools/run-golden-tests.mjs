@@ -4,6 +4,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as crypto from "node:crypto";
 import { spawnSync } from "node:child_process";
+import { OUT_DIR } from "./lib/paths.mjs";
 
 const BYTES_CONTEXT = 32; // 32 bytes on each side => 64 byte window
 
@@ -159,8 +160,15 @@ function compareReports(expectedReportPath, actualReportPath) {
   const expected = JSON.parse(fs.readFileSync(expectedReportPath, "utf-8"));
   const actual = JSON.parse(fs.readFileSync(actualReportPath, "utf-8"));
 
-  const expectedStable = JSON.stringify(stableSort(expected));
-  const actualStable = JSON.stringify(stableSort(actual));
+  // Remove versions section from comparison since it contains environment-specific metadata
+  // that doesn't affect the actual conversion quality
+  const expectedForComparison = { ...expected };
+  const actualForComparison = { ...actual };
+  delete expectedForComparison.versions;
+  delete actualForComparison.versions;
+
+  const expectedStable = JSON.stringify(stableSort(expectedForComparison));
+  const actualStable = JSON.stringify(stableSort(actualForComparison));
 
   if (expectedStable !== actualStable) {
     throw new Error("Report JSON mismatch");
@@ -207,7 +215,7 @@ async function runGoldenTests(structureOnly, resampler) {
 
   let failedCases = 0;
   let passedCases = 0;
-  const perCaseOutputDir = path.join(repoRoot, "out", "goldens");
+  const perCaseOutputDir = path.join(repoRoot, OUT_DIR, "goldens");
   ensureDir(perCaseOutputDir);
 
   for (const caseInfo of index.cases) {
@@ -421,8 +429,12 @@ async function runGoldenTests(structureOnly, resampler) {
         try {
           if (!structureOnly) {
             compareReports(expectedReportPath, actualReportPath);
+            // Calculate SHA of report without versions section for comparison
+            const actualReportContent = JSON.parse(fs.readFileSync(actualReportPath, "utf-8"));
+            const actualReportForSha = { ...actualReportContent };
+            delete actualReportForSha.versions;
             const actualReportSha = crypto.createHash("sha256")
-              .update(fs.readFileSync(actualReportPath))
+              .update(JSON.stringify(stableSort(actualReportForSha)))
               .digest("hex");
 
             if (!expectedReport.sha256) {

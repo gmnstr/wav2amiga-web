@@ -2,6 +2,8 @@
 
 Thank you for your interest in contributing to wav2amiga-web! This document outlines the development workflow and guidelines.
 
+> 📚 **Detailed Development Guide**: See [docs/development/contributing.md](docs/development/contributing.md) for comprehensive development documentation, coding standards, and advanced workflows.
+
 ## Tiny Invariants Header
 
 **no golden changes**, **ZOH only**, **single npm package `wav2amiga`**, **reports opt‑in**, **CI must be green before reporting success**.
@@ -154,6 +156,8 @@ Examples:
 - **packages/node-io**: FFmpeg-based audio decoding
 - **apps/cli**: Command-line interface
 - **apps/web**: Browser-based interface
+
+For detailed architecture information, see [System Architecture](docs/architecture.md).
 
 ## Questions?
 

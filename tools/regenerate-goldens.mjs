@@ -5,11 +5,12 @@ import * as path from "node:path";
 import * as crypto from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { getVersions } from "./versions.mjs";
+import { OUT_DIR } from "./lib/paths.mjs";
 
 const repoRoot = process.cwd();
 const goldensDir = path.join(repoRoot, "goldens");
 const indexPath = path.join(goldensDir, "index.json");
-const tmpOutputRoot = path.join(repoRoot, "out", "goldens-regenerate");
+const tmpOutputRoot = path.join(repoRoot, OUT_DIR, "goldens-regenerate");
 
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -66,6 +67,21 @@ function loadIndex() {
     console.error(`Error reading ${indexPath}:`, error instanceof Error ? error.message : String(error));
     process.exit(1);
   }
+}
+
+function stableSort(value) {
+  if (Array.isArray(value)) {
+    return value.map(stableSort);
+  }
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value)
+      .sort(([a], [b]) => a.localeCompare(b));
+    return entries.reduce((acc, [key, val]) => {
+      acc[key] = stableSort(val);
+      return acc;
+    }, {});
+  }
+  return value;
 }
 
 function normalizeVersion(value) {
@@ -177,6 +193,17 @@ function updateInputShas(caseInfo) {
 function copyAndHash(source, destination) {
   ensureDir(path.dirname(destination));
   fs.copyFileSync(source, destination);
+  
+  // For report files, compute SHA without versions section to match golden test logic
+  if (destination.endsWith('_report.json')) {
+    const reportContent = JSON.parse(fs.readFileSync(destination, "utf-8"));
+    const reportForSha = { ...reportContent };
+    delete reportForSha.versions;
+    return crypto.createHash("sha256")
+      .update(JSON.stringify(stableSort(reportForSha)))
+      .digest("hex");
+  }
+  
   return computeSha256(destination);
 }
 

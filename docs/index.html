@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wav2Amiga - Convert WAV to Amiga 8SVX</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background: #f8f9fa;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+            padding: 2rem 0;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .header h1 {
+            color: #2c3e50;
+            margin: 0 0 1rem 0;
+            font-size: 2.5rem;
+        }
+        .header p {
+            font-size: 1.2rem;
+            color: #666;
+            margin: 0;
+        }
+        .badges {
+            margin: 1rem 0;
+        }
+        .badges a {
+            margin: 0 0.5rem;
+            text-decoration: none;
+        }
+        .cta {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin: 2rem 0;
+        }
+        .btn {
+            display: inline-block;
+            padding: 1rem 2rem;
+            background: #3498db;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+        .btn:hover {
+            background: #2980b9;
+        }
+        .btn.secondary {
+            background: #95a5a6;
+        }
+        .btn.secondary:hover {
+            background: #7f8c8d;
+        }
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin: 3rem 0;
+        }
+        .feature {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .feature h3 {
+            color: #2c3e50;
+            margin-top: 0;
+        }
+        .code {
+            background: #f4f4f4;
+            padding: 1rem;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 3rem;
+            padding: 2rem;
+            color: #666;
+            border-top: 1px solid #eee;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Wav2Amiga</h1>
+            <p>Convert WAV files to Amiga 8SVX format with high-quality resampling</p>
+            <div class="badges">
+                <a href="https://github.com/gmnstr/wav2amiga-web/actions/workflows/ci.yml">
+                    <img src="https://github.com/gmnstr/wav2amiga-web/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI">
+                </a>
+                <a href="https://www.npmjs.com/package/wav2amiga">
+                    <img src="https://img.shields.io/npm/v/wav2amiga" alt="npm">
+                </a>
+            </div>
+            <div class="cta">
+                <a href="./app/" class="btn">Try Web Converter</a>
+                <a href="https://github.com/gmnstr/wav2amiga-web" class="btn secondary">View on GitHub</a>
+            </div>
+        </div>
+
+        <div class="features">
+            <div class="feature">
+                <h3>🎵 ZOH Resampling</h3>
+                <p>Zero-order hold resampling preserves transients without interpolation or low-pass filtering, matching Paula chip sample-and-hold behavior.</p>
+            </div>
+            <div class="feature">
+                <h3>🌐 Cross-Platform</h3>
+                <p>CLI tool for batch conversion and web interface for browser-based conversion with drag-and-drop support.</p>
+            </div>
+            <div class="feature">
+                <h3>🎯 Deterministic</h3>
+                <p>Byte-identical output across all platforms through pure integer math and pinned toolchain versions.</p>
+            </div>
+            <div class="feature">
+                <h3>📦 Multiple Modes</h3>
+                <p>Single, stacked, and stacked-equal sample layouts for different ProTracker use cases.</p>
+            </div>
+        </div>
+
+        <div class="feature">
+            <h3>Quick Start</h3>
+            <p>Install the CLI tool globally:</p>
+            <div class="code">npm install -g wav2amiga</div>
+            <p>Convert a single sample:</p>
+            <div class="code">wav2amiga --mode single --note C-2 input.wav</div>
+            <p>Or use the <a href="./app/">web interface</a> for drag-and-drop conversion.</p>
+        </div>
+
+        <div class="footer">
+            <p>For complete documentation, see <a href="https://github.com/gmnstr/wav2amiga-web/tree/main/docs">docs/</a></p>
+            <p>MIT License • <a href="https://github.com/gmnstr/wav2amiga-web">GitHub</a></p>
+        </div>
+    </div>
+</body>
+</html>

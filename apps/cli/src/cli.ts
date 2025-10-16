@@ -4,6 +4,7 @@ import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { execSync } from "node:child_process";
 import { decodePCM16Mono, decodeAndResampleToPcm16 } from "@wav2amiga/node-io";
 import { createWasmResampler } from "@wav2amiga/resampler-wasm";
 import { createZohResampler } from "@wav2amiga/resampler-zoh";
@@ -20,6 +21,59 @@ import {
   ResampleAPI,
 } from "@wav2amiga/core";
 import { errors, warnings, EXIT_USAGE, CliError } from "./errors.js";
+
+/**
+ * Gets current versions of all toolchain components (matches tools/versions.mjs)
+ */
+function getVersions() {
+  const versions = {
+    node: process.version,
+    pnpm: "unknown",
+    ffmpeg: "unknown",
+    resampler: {
+      name: "zoh",
+      version: "unknown"
+    },
+    git: "unknown",
+  };
+
+  try {
+    // Get pnpm version
+    try {
+      const pnpmVersion = execSync("pnpm --version", { encoding: "utf-8" }).trim();
+      versions.pnpm = pnpmVersion;
+    } catch (error) {
+      // Ignore pnpm version errors
+    }
+
+    // Get resampler metadata
+    const zohPackagePath = path.join(process.cwd(), "packages", "resampler-zoh", "package.json");
+    if (fs.existsSync(zohPackagePath)) {
+      try {
+        const pkg = JSON.parse(fs.readFileSync(zohPackagePath, "utf-8"));
+        versions.resampler = {
+          name: "zoh",
+          version: pkg.version || "unknown"
+        };
+      } catch (error) {
+        // Ignore resampler version errors
+      }
+    }
+
+    // Get git commit
+    try {
+      const gitCommit = execSync("git rev-parse HEAD", { encoding: "utf-8" }).trim();
+      versions.git = gitCommit;
+    } catch (error) {
+      // Ignore git version errors
+    }
+
+  } catch (error) {
+    // Ignore all version errors
+  }
+
+  return versions;
+}
 
 // 8SVX file format constants
 const EIGHTSVX_HEADER = "8SVX";
@@ -437,16 +491,19 @@ For more information, see README.md`
       resamplerMeta = resamplerInstance.meta;
     }
 
+    // Get versions using the same logic as tools/versions.mjs
+    const versions = getVersions();
+    
     const report: Report = {
       mode,
       outputFile: outputFilename,
       segments,
       versions: {
-        node: process.version,
-        pnpm: "unknown", // Would be populated by tools
-        ffmpeg: "unknown", // Would be populated by tools
+        node: versions.node,
+        pnpm: versions.pnpm,
+        ffmpeg: versions.ffmpeg,
         resampler: resamplerMeta,
-        git: "unknown", // Would be populated by tools
+        git: versions.git,
       },
     };
 

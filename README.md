@@ -1,10 +1,12 @@
 # wav2amiga-web
 
-[![CI Ubuntu](https://github.com/gemini/wav2amiga-web/workflows/ci/badge.svg?event=push&branch=main)](https://github.com/gemini/wav2amiga-web/actions)
-[![CI macOS](https://github.com/gemini/wav2amiga-web/workflows/ci/badge.svg?event=push&branch=main)](https://github.com/gemini/wav2amiga-web/actions)
-[![CI Windows](https://github.com/gemini/wav2amiga-web/workflows/ci/badge.svg?event=push&branch=main)](https://github.com/gemini/wav2amiga-web/actions)
+[![CI](https://github.com/gmnstr/wav2amiga-web/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/gmnstr/wav2amiga-web/actions/workflows/ci.yml)
+[![Demo](https://img.shields.io/badge/demo-website-blue)](https://gmnstr.github.io/wav2amiga-web/)
+[![npm](https://img.shields.io/npm/v/wav2amiga)](https://www.npmjs.com/package/wav2amiga)
 
 Convert WAV files to Amiga 8SVX format with high-quality resampling.
+
+> 📚 **Comprehensive Documentation**: See [docs/README.md](docs/README.md) for complete guides, API reference, and development documentation.
 
 ## Features
 
@@ -66,6 +68,8 @@ pnpm test:golden:zoh
 - **packages/node-io**: FFmpeg-based audio decoding
 - **apps/cli**: Command-line interface
 - **apps/web**: Browser-based interface
+
+For detailed architecture information, see [System Architecture](docs/architecture.md).
 
 ## License
 

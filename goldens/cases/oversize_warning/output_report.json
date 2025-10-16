@@ -84875,13 +84875,13 @@
     }
   ],
   "versions": {
-    "node": "v20.19.5",
-    "pnpm": "unknown",
+    "node": "v20.19.0",
+    "pnpm": "9.10.0",
     "ffmpeg": "unknown",
     "resampler": {
       "name": "zoh",
       "version": "1.0.0"
     },
-    "git": "unknown"
+    "git": "a20d239a1981d3196d31f1c91602f3b8dd22bd7e"
   }
 }

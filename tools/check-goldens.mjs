@@ -4,8 +4,24 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as crypto from "node:crypto";
 import { spawnSync } from "node:child_process";
+import { OUT_DIR, OUT_DIFF } from "./lib/paths.mjs";
 
 const BYTES_CONTEXT = 32; // 32 bytes on each side => 64 byte window
+
+function stableSort(value) {
+  if (Array.isArray(value)) {
+    return value.map(stableSort);
+  }
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value)
+      .sort(([a], [b]) => a.localeCompare(b));
+    return entries.reduce((acc, [key, val]) => {
+      acc[key] = stableSort(val);
+      return acc;
+    }, {});
+  }
+  return value;
+}
 
 function formatHex(buffer) {
   return Array.from(buffer)
@@ -130,7 +146,7 @@ function runCli(commandArgs, cwd) {
 }
 
 function writeHexdumpDiff(caseId, filename, expectedBuffer, actualBuffer, diff) {
-  const diffDir = path.join(process.cwd(), "out", "diff");
+  const diffDir = path.join(process.cwd(), OUT_DIFF);
   ensureDir(diffDir);
   
   const diffPath = path.join(diffDir, `${caseId}-${filename}.txt`);
@@ -176,7 +192,7 @@ async function checkGoldenDrift(resampler) {
 
   let failedCases = 0;
   let passedCases = 0;
-  const perCaseOutputDir = path.join(repoRoot, "out", "golden-drift");
+  const perCaseOutputDir = path.join(repoRoot, OUT_DIR, "golden-drift");
   ensureDir(perCaseOutputDir);
 
   for (const caseInfo of index.cases) {
@@ -325,8 +341,12 @@ async function checkGoldenDrift(resampler) {
         console.error(`❌ Expected report missing: ${expectedReportPath}`);
         caseFailed = true;
       } else {
+        // Calculate SHA of report without versions section to match golden test logic
+        const actualReportContent = JSON.parse(fs.readFileSync(actualReportPath, "utf-8"));
+        const actualReportForSha = { ...actualReportContent };
+        delete actualReportForSha.versions;
         const actualReportSha = crypto.createHash("sha256")
-          .update(fs.readFileSync(actualReportPath))
+          .update(JSON.stringify(stableSort(actualReportForSha)))
           .digest("hex");
 
         if (!expectedReport.sha256) {
