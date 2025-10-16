@@ -845,7 +845,7 @@
     }
   ],
   "versions": {
-    "node": "v20.19.0",
+    "node": "v20.17.0",
     "pnpm": "unknown",
     "ffmpeg": "unknown",
     "resampler": {
