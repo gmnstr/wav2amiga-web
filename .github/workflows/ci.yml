@@ -7,31 +7,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: corepack enable
-      - name: Install Node.js 20.17.0
-        uses: actions/setup-node@v4.4.0
+      - uses: actions/setup-node@v4.4.0
         with:
-          node-version: '20.17.0'
+          node-version: '20.x'
           cache: 'pnpm'
-          check-latest: true
-      - name: Force Node.js version on Windows
-        if: matrix.os == 'windows-latest'
-        run: |
-          # Remove any existing Node.js from PATH
-          $env:PATH = ($env:PATH -split ';' | Where-Object { $_ -notlike '*node*' }) -join ';'
-          # Install Node.js 20.17.0 using winget
-          winget install OpenJS.NodeJS --version 20.17.0 --silent --accept-package-agreements --accept-source-agreements
-          # Refresh PATH
-          $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("PATH", "User")
-      - run: node --version
-      - name: Verify Node.js version on Windows
-        if: matrix.os == 'windows-latest'
-        run: |
-          $nodeVersion = node --version
-          Write-Host "Current Node.js version: $nodeVersion"
-          if ($nodeVersion -ne "v20.17.0") {
-            Write-Host "Node.js version mismatch! Expected v20.17.0, got $nodeVersion"
-            exit 1
-          }
       - run: pnpm -v
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
@@ -60,31 +39,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: corepack enable
-      - name: Install Node.js 20.17.0
-        uses: actions/setup-node@v4.4.0
+      - uses: actions/setup-node@v4.4.0
         with:
-          node-version: '20.17.0'
+          node-version: '20.x'
           cache: 'pnpm'
-          check-latest: true
-      - name: Force Node.js version on Windows
-        if: matrix.os == 'windows-latest'
-        run: |
-          # Remove any existing Node.js from PATH
-          $env:PATH = ($env:PATH -split ';' | Where-Object { $_ -notlike '*node*' }) -join ';'
-          # Install Node.js 20.17.0 using winget
-          winget install OpenJS.NodeJS --version 20.17.0 --silent --accept-package-agreements --accept-source-agreements
-          # Refresh PATH
-          $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("PATH", "User")
       - run: node --version
-      - name: Verify Node.js version on Windows
-        if: matrix.os == 'windows-latest'
-        run: |
-          $nodeVersion = node --version
-          Write-Host "Current Node.js version: $nodeVersion"
-          if ($nodeVersion -ne "v20.17.0") {
-            Write-Host "Node.js version mismatch! Expected v20.17.0, got $nodeVersion"
-            exit 1
-          }
       - run: pnpm -v
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
