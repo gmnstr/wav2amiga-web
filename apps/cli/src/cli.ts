@@ -4,9 +4,11 @@ import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { spawnSync } from "node:child_process";
 import { decodePCM16Mono, decodeAndResampleToPcm16 } from "@wav2amiga/node-io";
 import { createWasmResampler } from "@wav2amiga/resampler-wasm";
 import { createZohResampler } from "@wav2amiga/resampler-zoh";
+// Inline versions logic to avoid import issues
 import {
   mapPcm16To8Bit,
   validateMonoPcm16,
@@ -437,16 +439,61 @@ For more information, see README.md`
       resamplerMeta = resamplerInstance.meta;
     }
 
+    // Get versions inline
+    const versions = {
+      node: process.version,
+      pnpm: "unknown",
+      ffmpeg: "unknown",
+      resampler: {
+        name: "zoh",
+        version: "unknown"
+      },
+      git: "unknown",
+    };
+
+    try {
+      // Get pnpm version
+      try {
+        const pnpmVersion = spawnSync("pnpm", ["--version"], { encoding: "utf-8" }).stdout?.trim();
+        if (pnpmVersion) versions.pnpm = pnpmVersion;
+      } catch (error) {
+        // Ignore pnpm version errors
+      }
+
+      // Get git commit
+      try {
+        const gitCommit = spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf-8" }).stdout?.trim();
+        if (gitCommit) versions.git = gitCommit;
+      } catch (error) {
+        // Ignore git version errors
+      }
+
+      // Get resampler version from package.json
+      try {
+        const zohPackagePath = path.join(process.cwd(), "packages", "resampler-zoh", "package.json");
+        if (fs.existsSync(zohPackagePath)) {
+          const pkg = JSON.parse(fs.readFileSync(zohPackagePath, "utf-8"));
+          versions.resampler = {
+            name: "zoh",
+            version: pkg.version || "unknown"
+          };
+        }
+      } catch (error) {
+        // Ignore resampler version errors
+      }
+    } catch (error) {
+      // Ignore all version errors
+    }
     const report: Report = {
       mode,
       outputFile: outputFilename,
       segments,
       versions: {
-        node: process.version,
-        pnpm: "unknown", // Would be populated by tools
-        ffmpeg: "unknown", // Would be populated by tools
+        node: versions.node,
+        pnpm: versions.pnpm,
+        ffmpeg: versions.ffmpeg,
         resampler: resamplerMeta,
-        git: "unknown", // Would be populated by tools
+        git: versions.git,
       },
     };
 
