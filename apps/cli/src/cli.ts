@@ -259,8 +259,12 @@ For more information, see README.md`
         throw errors.fileNotFound(file);
       }
 
-      // Find manifest entry for this file
-      const manifestEntry = manifestEntries.find(entry => entry.filepath === file);
+      // Find manifest entry for this file (normalize paths for Windows compatibility)
+      const normalizedFile = file.split(path.sep).join('/');
+      const manifestEntry = manifestEntries.find(entry => {
+        const normalizedEntry = entry.filepath.split(path.sep).join('/');
+        return normalizedEntry === normalizedFile;
+      });
       if (!manifestEntry) {
         console.error(`Error: No manifest entry found for ${file}`);
         process.exit(EXIT_USAGE);
