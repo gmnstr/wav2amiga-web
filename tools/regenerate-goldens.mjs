@@ -3,153 +3,302 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as crypto from "node:crypto";
-import { execSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { getVersions } from "./versions.mjs";
 
-/**
- * Regenerates golden test outputs and updates index.json
- * Includes guard to prevent regeneration with mismatched toolchain
- */
-async function regenerateGoldens() {
-  const goldensDir = path.join(process.cwd(), "goldens");
-  const indexPath = path.join(goldensDir, "index.json");
+const repoRoot = process.cwd();
+const goldensDir = path.join(repoRoot, "goldens");
+const indexPath = path.join(goldensDir, "index.json");
+const tmpOutputRoot = path.join(repoRoot, "out", "goldens-regenerate");
 
+function parseArgs() {
+  const args = process.argv.slice(2);
+  const caseIds = new Set();
+  let resampler = "zoh";
+  let skipToolchainCheck = false;
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === "--case") {
+      const value = args[++i];
+      if (!value) {
+        console.error("Error: --case requires a value");
+        process.exit(1);
+      }
+      caseIds.add(value);
+      continue;
+    }
+    if (arg === "--resampler") {
+      const value = args[++i];
+      if (!value) {
+        console.error("Error: --resampler requires a value");
+        process.exit(1);
+      }
+      resampler = value;
+      continue;
+    }
+    if (arg === "--skip-toolchain-check") {
+      skipToolchainCheck = true;
+      continue;
+    }
+    if (arg === "--help" || arg === "-h") {
+      console.log("Usage: node tools/regenerate-goldens.mjs [--case <id> ...] [--resampler <name>] [--skip-toolchain-check]");
+      console.log("");
+      console.log("Regenerates golden outputs for the selected cases using the wav2amiga CLI.");
+      console.log("Defaults to the ZOH resampler. Pass multiple --case flags to limit regeneration.");
+      process.exit(0);
+    }
+    console.error(`Unknown argument: ${arg}`);
+    process.exit(1);
+  }
+
+  return { caseIds, resampler, skipToolchainCheck };
+}
+
+function loadIndex() {
   if (!fs.existsSync(indexPath)) {
     console.error("Error: goldens/index.json not found");
     process.exit(1);
   }
-
-  let index;
   try {
-    index = JSON.parse(fs.readFileSync(indexPath, "utf-8"));
+    return JSON.parse(fs.readFileSync(indexPath, "utf-8"));
   } catch (error) {
-    console.error(`Error reading ${indexPath}:`, error.message);
+    console.error(`Error reading ${indexPath}:`, error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
+}
+
+function normalizeVersion(value) {
+  return (value ?? "").toString().replace(/^v/, "");
+}
+
+function ensureToolchain(current, expected) {
+  if (!expected) {
+    return;
+  }
+
+  if (normalizeVersion(current.node) !== normalizeVersion(expected.node)) {
+    console.error("❌ Node.js version mismatch");
+    console.error(`    Expected: ${expected.node}`);
+    console.error(`    Current:  ${current.node}`);
     process.exit(1);
   }
 
-  // Check toolchain compatibility
-  const currentVersions = await getVersions();
-  const expectedVersions = index.toolchain;
-
-  console.log("Checking toolchain compatibility...");
-  console.log(`Current Node.js: ${currentVersions.node} (expected: ${expectedVersions.node})`);
-  console.log(`Current pnpm: ${currentVersions.pnpm} (expected: ${expectedVersions.pnpm})`);
-
-  if (currentVersions.node !== expectedVersions.node) {
-    console.error("❌ Node.js version mismatch!");
-    console.error(`  Expected: ${expectedVersions.node}`);
-    console.error(`  Current:  ${currentVersions.node}`);
-    console.error("Refusing to regenerate goldens with different toolchain.");
+  if ((expected.pnpm ?? "") !== (current.pnpm ?? "")) {
+    console.error("❌ pnpm version mismatch");
+    console.error(`    Expected: ${expected.pnpm}`);
+    console.error(`    Current:  ${current.pnpm}`);
     process.exit(1);
   }
 
-  if (currentVersions.pnpm !== expectedVersions.pnpm) {
-    console.error("❌ pnpm version mismatch!");
-    console.error(`  Expected: ${expectedVersions.pnpm}`);
-    console.error(`  Current:  ${currentVersions.pnpm}`);
-    console.error("Refusing to regenerate goldens with different toolchain.");
+  if (expected.resampler?.name && current.resampler?.name && expected.resampler.name !== current.resampler.name) {
+    console.error("❌ Resampler mismatch");
+    console.error(`    Expected: ${expected.resampler.name}`);
+    console.error(`    Current:  ${current.resampler.name}`);
+    process.exit(1);
+  }
+}
+
+function ensureDir(target) {
+  if (!fs.existsSync(target)) {
+    fs.mkdirSync(target, { recursive: true });
+  }
+}
+
+function computeSha256(filePath) {
+  return crypto.createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
+}
+
+function buildCliArgs(caseInfo, options) {
+  const args = [
+    "--mode",
+    caseInfo.mode,
+    "--out-dir",
+    options.outputDir,
+    "--resampler",
+    options.resampler,
+    "--emit-report",
+    "--force",
+  ];
+
+  if (caseInfo.note) {
+    args.push("--note", caseInfo.note);
+  }
+
+  if (caseInfo.manifest) {
+    args.push("--manifest", options.manifestPath);
+  }
+
+  args.push(...options.inputFiles);
+  return args;
+}
+
+function runCli(args) {
+  const cliPath = path.join(repoRoot, "apps", "cli", "dist", "cli.js");
+  if (!fs.existsSync(cliPath)) {
+    console.error("CLI binary not found at apps/cli/dist/cli.js. Run pnpm build first.");
     process.exit(1);
   }
 
-  if (expectedVersions.ffmpeg && currentVersions.ffmpeg !== expectedVersions.ffmpeg) {
-    console.warn("⚠️  FFmpeg version mismatch - this may affect results");
-    console.warn(`  Expected: ${expectedVersions.ffmpeg}`);
-    console.warn(`  Current:  ${currentVersions.ffmpeg}`);
-  }
-
-  if (expectedVersions.wasm?.sha256 && currentVersions.wasmSha256 !== expectedVersions.wasm.sha256) {
-    console.error("❌ WASM SHA256 mismatch!");
-    console.error(`  Expected: ${expectedVersions.wasm.sha256}`);
-    console.error(`  Current:  ${currentVersions.wasmSha256}`);
-    console.error("Refusing to regenerate goldens with different WASM binary.");
-    process.exit(1);
-  }
-
-  console.log("✅ Toolchain compatibility check passed");
-
-  // Regenerate outputs for each case
-  const outputDir = path.join(process.cwd(), "out");
-  if (!fs.existsSync(outputDir)) {
-    fs.mkdirSync(outputDir, { recursive: true });
-  }
-
-  console.log("\nRegenerating golden outputs...");
-
-  for (const caseInfo of index.cases) {
-    console.log(`\nRegenerating case: ${caseInfo.id}`);
-
-    try {
-      // Run the CLI tool to generate output
-      const inputPath = path.join(goldensDir, caseInfo.inputs[0]);
-      const cmd = `node apps/cli/dist/cli.js --mode ${caseInfo.mode} --note ${caseInfo.note} --out-dir ${outputDir} --resampler wasm --emit-report ${inputPath}`;
-
-      console.log(`Running: ${cmd}`);
-      execSync(cmd, { stdio: 'inherit' });
-
-      // Update SHA256s in index.json
-      const expectedOutput = caseInfo.expect.output;
-      const outputPath = path.join(outputDir, path.basename(expectedOutput.path));
-
-      if (fs.existsSync(outputPath)) {
-        const outputBuffer = fs.readFileSync(outputPath);
-        const newSha256 = crypto.createHash('sha256').update(outputBuffer).digest('hex');
-        expectedOutput.sha256 = newSha256;
-        console.log(`Updated output SHA256: ${newSha256}`);
-      } else {
-        console.error(`❌ Output file not created: ${outputPath}`);
-        continue;
-      }
-
-      // Update report SHA256 if present
-      const expectedReport = caseInfo.expect.report;
-      if (expectedReport) {
-        const reportPath = path.join(outputDir, path.basename(expectedReport.path));
-
-        if (fs.existsSync(reportPath)) {
-          const reportBuffer = fs.readFileSync(reportPath);
-          const newReportSha256 = crypto.createHash('sha256').update(reportBuffer).digest('hex');
-          expectedReport.sha256 = newReportSha256;
-          console.log(`Updated report SHA256: ${newReportSha256}`);
-        } else {
-          console.error(`❌ Report file not created: ${reportPath}`);
-        }
-      }
-
-    } catch (error) {
-      console.error(`❌ Error regenerating ${caseInfo.id}:`, error.message);
+  const result = spawnSync(
+    process.execPath,
+    [cliPath, ...args],
+    {
+      cwd: repoRoot,
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "pipe"],
     }
+  );
+
+  if (result.error) {
+    throw result.error;
+  }
+  if (result.status !== 0) {
+    console.error(result.stdout.trim());
+    console.error(result.stderr.trim());
+    throw new Error(`CLI exited with status ${result.status}`);
   }
 
-  // Update toolchain info in index.json
-  index.toolchain = currentVersions;
+  return result;
+}
 
-  // Write updated index.json
+function updateInputShas(caseInfo) {
+  caseInfo.inputs = (caseInfo.inputs ?? []).map((entry) => {
+    const relPath = typeof entry === "string" ? entry : entry.path;
+    const absolute = path.join(goldensDir, relPath);
+    if (!fs.existsSync(absolute)) {
+      throw new Error(`Missing input file ${relPath}`);
+    }
+    const sha256 = computeSha256(absolute);
+    return { path: relPath, sha256 };
+  });
+}
+
+function copyAndHash(source, destination) {
+  ensureDir(path.dirname(destination));
+  fs.copyFileSync(source, destination);
+  return computeSha256(destination);
+}
+
+async function regenerate() {
+  const { caseIds, resampler, skipToolchainCheck } = parseArgs();
+  const index = loadIndex();
+  const cases = index.cases ?? [];
+
+  if (cases.length === 0) {
+    console.warn("No golden cases defined.");
+    return;
+  }
+
+  const selectedCases = caseIds.size > 0
+    ? cases.filter((c) => caseIds.has(c.id))
+    : cases;
+
+  if (caseIds.size > 0 && selectedCases.length !== caseIds.size) {
+    const missing = [...caseIds].filter((id) => !selectedCases.find((c) => c.id === id));
+    console.error(`Error: Unknown case id(s): ${missing.join(", ")}`);
+    process.exit(1);
+  }
+
+  const currentVersions = await getVersions();
+  if (!skipToolchainCheck) {
+    ensureToolchain(currentVersions, index.toolchain);
+  } else {
+    console.warn("⚠️  Skipping toolchain compatibility check");
+  }
+
+  ensureDir(tmpOutputRoot);
+
+  for (const caseInfo of selectedCases) {
+    console.log(`\nRegenerating ${caseInfo.id} with resampler=${resampler}...`);
+
+    const caseTmpDir = path.join(tmpOutputRoot, caseInfo.id);
+    ensureDir(caseTmpDir);
+    for (const entry of fs.readdirSync(caseTmpDir)) {
+      fs.rmSync(path.join(caseTmpDir, entry), { recursive: true, force: true });
+    }
+
+    const inputEntries = caseInfo.inputs ?? [];
+    if (inputEntries.length === 0) {
+      throw new Error(`Case ${caseInfo.id} has no inputs`);
+    }
+
+    const resolvedInputs = inputEntries.map((entry) => {
+      const relPath = typeof entry === "string" ? entry : entry.path;
+      const repoRelative = path.join("goldens", relPath);
+      return {
+        relPath,
+        repoRelative,
+        absolute: path.join(repoRoot, repoRelative),
+      };
+    });
+
+    for (const resolved of resolvedInputs) {
+      if (!fs.existsSync(resolved.absolute)) {
+        throw new Error(`Input not found: ${resolved.relPath}`);
+      }
+    }
+
+    const manifestRelative = caseInfo.manifest ? path.join("goldens", caseInfo.manifest) : undefined;
+    const manifestPath = manifestRelative ? path.join(repoRoot, manifestRelative) : undefined;
+    if (caseInfo.manifest && !fs.existsSync(manifestPath)) {
+      throw new Error(`Manifest not found: ${caseInfo.manifest}`);
+    }
+
+    const cliArgs = buildCliArgs(caseInfo, {
+      outputDir: caseTmpDir,
+      resampler,
+      manifestPath: manifestRelative,
+      inputFiles: resolvedInputs.map((entry) => entry.repoRelative),
+    });
+
+    const result = runCli(cliArgs);
+
+    if (result.stdout.trim()) {
+      console.log(result.stdout.trim());
+    }
+    if (result.stderr.trim()) {
+      console.error(result.stderr.trim());
+    }
+
+    const expectedOutput = caseInfo.expect?.output;
+    if (!expectedOutput) {
+      throw new Error(`Case ${caseInfo.id} missing expect.output`);
+    }
+
+    const outputFilename = path.basename(expectedOutput.path);
+    const tmpOutput = path.join(caseTmpDir, outputFilename);
+    if (!fs.existsSync(tmpOutput)) {
+      throw new Error(`CLI did not produce ${outputFilename}`);
+    }
+
+    const destinationOutput = path.join(goldensDir, expectedOutput.path);
+    const outputSha = copyAndHash(tmpOutput, destinationOutput);
+    caseInfo.expect.output.sha256 = outputSha;
+    console.log(`  Updated output SHA256: ${outputSha}`);
+
+    const expectedReport = caseInfo.expect.report;
+    if (expectedReport) {
+      const reportFilename = path.basename(expectedReport.path);
+      const tmpReport = path.join(caseTmpDir, reportFilename);
+      if (!fs.existsSync(tmpReport)) {
+        throw new Error(`CLI did not produce ${reportFilename}`);
+      }
+      const destinationReport = path.join(goldensDir, expectedReport.path);
+      const reportSha = copyAndHash(tmpReport, destinationReport);
+      caseInfo.expect.report.sha256 = reportSha;
+      console.log(`  Updated report SHA256: ${reportSha}`);
+    }
+
+    updateInputShas(caseInfo);
+  }
+
+  index.toolchain = currentVersions;
   fs.writeFileSync(indexPath, JSON.stringify(index, null, 2));
   console.log(`\n✅ Updated ${indexPath}`);
-
-  console.log("\nGolden regeneration completed successfully!");
-  console.log("Remember to commit the updated goldens/ directory.");
 }
 
-/**
- * Main function
- */
-async function main() {
-  if (process.argv.includes('--help') || process.argv.includes('-h')) {
-    console.log("Usage: node tools/regenerate-goldens.mjs");
-    console.log("");
-    console.log("Regenerates golden test outputs and updates SHA256s.");
-    console.log("Performs toolchain compatibility check before regeneration.");
-    console.log("");
-    console.log("Options:");
-    console.log("  --help, -h    Show this help message");
-    process.exit(0);
-  }
-
-  await regenerateGoldens();
-}
-
-main().catch((error) => {
-  console.error("Error:", error.message);
+regenerate().catch((error) => {
+  console.error("Error:", error instanceof Error ? error.message : String(error));
   process.exit(1);
 });

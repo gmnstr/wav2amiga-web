@@ -3,19 +3,19 @@
   "private": true,
   "packageManager": "pnpm@9.10.0",
   "engines": {
-    "node": "20.17.0"
+    "node": ">=20.11.0 <21.0.0"
   },
   "volta": {
-    "node": "20.17.0",
+    "node": "20.19.5",
     "pnpm": "9.10.0"
   },
   "scripts": {
     "build": "pnpm -r run build",
     "lint": "pnpm -r exec eslint .",
-    "test": "pnpm run test:unit && pnpm run test:golden:wasm",
-    "test:unit": "pnpm -r --filter ./packages/core run test",
-    "test:golden:wasm": "pnpm -r --filter ./packages/* run build && pnpm -r --filter ./apps/cli run build && node tools/run-golden-tests.mjs --resampler wasm",
-    "test:cli:ffmpeg": "pnpm -r --filter ./packages/* run build && pnpm -r --filter ./apps/cli run build && node tools/run-golden-tests.mjs --resampler ffmpeg --structure-only",
+    "test": "pnpm run test:unit && pnpm run test:golden:byteequal",
+    "test:unit": "pnpm -r --filter ./packages/core --filter ./packages/resampler-zoh --filter ./apps/cli run test",
+    "test:golden:byteequal": "pnpm -r --filter ./packages/* --if-present run build && pnpm -r --filter ./apps/cli run build && node tools/run-golden-tests.mjs",
+    "test:cli:ffmpeg": "pnpm -r --filter ./packages/* --if-present run build && pnpm -r --filter ./apps/cli run build && node tools/run-golden-tests.mjs --structure-only --resampler ffmpeg",
     "versions:print": "node tools/versions.mjs",
     "goldens:regen": "node tools/regenerate-goldens.mjs"
   },

@@ -1,0 +1,5 @@
+[
+  { "filepath": "goldens/cases/stackedequal_uniform/input_a.wav", "note": "C-2" },
+  { "filepath": "goldens/cases/stackedequal_uniform/input_b.wav", "note": "C-2" },
+  { "filepath": "goldens/cases/stackedequal_uniform/input_c.wav", "note": "C-2" }
+]

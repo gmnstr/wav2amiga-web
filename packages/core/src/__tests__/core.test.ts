@@ -92,9 +92,9 @@ describe("noteToTargetHz", () => {
   });
 
   it("rejects invalid notes", () => {
-    expect(() => noteToTargetHz("Invalid")).toThrow("Invalid note: Invalid");
-    expect(() => noteToTargetHz("")).toThrow("Invalid note:");
-    expect(() => noteToTargetHz("X-1")).toThrow("Invalid note: X-1");
+    expect(() => noteToTargetHz("Invalid")).toThrow("'Invalid' is not a valid ProTracker note");
+    expect(() => noteToTargetHz("")).toThrow("'' is not a valid ProTracker note");
+    expect(() => noteToTargetHz("X-1")).toThrow("'X-1' is not a valid ProTracker note");
   });
 
   it("has all expected PAL periods", () => {
@@ -190,10 +190,10 @@ describe("validateMonoPcm16", () => {
   it("rejects non-mono inputs", () => {
     const stereoInput = new Int16Array(200);
     expect(() => validateMonoPcm16(stereoInput, 2)).toThrow(
-      "Input must be mono (1 channel), got 2 channels"
+      "2 channels detected, expected 1 (mono)"
     );
     expect(() => validateMonoPcm16(stereoInput, 0)).toThrow(
-      "Input must be mono (1 channel), got 0 channels"
+      "0 channels detected, expected 1 (mono)"
     );
   });
 });

@@ -6,6 +6,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { decodePCM16Mono, decodeAndResampleToPcm16 } from "@wav2amiga/node-io";
 import { createWasmResampler } from "@wav2amiga/resampler-wasm";
+import { createZohResampler } from "@wav2amiga/resampler-zoh";
 import {
   mapPcm16To8Bit,
   validateMonoPcm16,
@@ -18,6 +19,7 @@ import {
   alignTo256,
   ResampleAPI,
 } from "@wav2amiga/core";
+import { errors, warnings, EXIT_USAGE, CliError } from "./errors.js";
 
 // 8SVX file format constants
 const EIGHTSVX_HEADER = "8SVX";
@@ -97,10 +99,34 @@ interface Report {
 
 async function main() {
   const argv = await yargs(hideBin(process.argv))
-    .usage("$0 [options] <files...>")
+    .usage("Usage: $0 [options] <files...>")
+    .epilogue(
+      `Modes:
+  single        - One sample per file, direct conversion
+  stacked       - Multiple samples with variable offsets (offset₁, offset₂, ...)
+  stacked-equal - Multiple samples with uniform slot spacing
+
+Notes:
+  • PAL Amiga only (3546895Hz base clock)
+  • Mono input required (stereo will be rejected)
+  • Output format: headerless .8SVX (IFF/8SVX container)
+  • Default resampler: ZOH (zero-order hold, preserves transients)
+
+Examples:
+  # Single mode
+  $0 --mode single --note C-2 kick.wav
+
+  # Stacked mode with manifest
+  $0 --mode stacked --manifest drumkit.json input_*.wav
+
+  # Stacked-equal with FFmpeg resampler
+  $0 --mode stacked-equal --manifest kit.json --resampler ffmpeg *.wav
+
+For more information, see README.md`
+    )
     .option("mode", {
       alias: "m",
-      describe: "Output mode",
+      describe: "Output mode (single | stacked | stacked-equal)",
       choices: ["single", "stacked", "stacked-equal"] as const,
       demandOption: true,
     })
@@ -125,9 +151,9 @@ async function main() {
       default: false,
     })
     .option("resampler", {
-      describe: "Resampler to use",
-      choices: ["wasm", "ffmpeg"] as const,
-      default: "wasm",
+      describe: "Resampler to use (zoh=zero-order hold, no interpolation, preserves transients; ffmpeg=interpolated with low-pass filtering)",
+      choices: ["wasm", "ffmpeg", "zoh"] as const,
+      default: "zoh",
     })
     .option("force", {
       alias: "f",
@@ -157,15 +183,18 @@ async function main() {
     _: files
   } = argv;
 
-  // Validate arguments
+  // Validate flag combinations
+  if (manifest && note && (mode === "stacked" || mode === "stacked-equal")) {
+    throw errors.flagConflict();
+  }
+
   if (mode === "single" && !note) {
-    console.error("Error: --note is required for single mode");
-    process.exit(1);
+    throw errors.missingNoteSingle();
   }
 
   if ((mode === "stacked" || mode === "stacked-equal") && !manifest) {
     console.error(`Error: --manifest is required for ${mode} mode`);
-    process.exit(1);
+    process.exit(EXIT_USAGE);
   }
 
   // Parse manifest if provided
@@ -196,7 +225,9 @@ async function main() {
 
   // Initialize resampler once
   let resamplerInstance: ResampleAPI | null = null;
-  if (resampler === "wasm") {
+  if (resampler === "zoh") {
+    resamplerInstance = createZohResampler();
+  } else if (resampler === "wasm") {
     try {
       resamplerInstance = await createWasmResampler();
     } catch (error) {
@@ -219,22 +250,62 @@ async function main() {
     const file = files[i] as string;
 
     if (verbose) {
-      console.log(`Processing ${file}...`);
+      console.error(`Processing ${file}...`);
     }
 
     try {
-      // Find manifest entry for this file
-      const manifestEntry = manifestEntries.find(entry => entry.filepath === file);
+      // Check file exists first
+      if (!fs.existsSync(file)) {
+        throw errors.fileNotFound(file);
+      }
+
+      // Find manifest entry for this file (normalize paths for Windows compatibility)
+      const normalizedFile = file.split(path.sep).join('/');
+      const manifestEntry = manifestEntries.find(entry => {
+        const normalizedEntry = entry.filepath.split(path.sep).join('/');
+        return normalizedEntry === normalizedFile;
+      });
       if (!manifestEntry) {
         console.error(`Error: No manifest entry found for ${file}`);
-        process.exit(1);
+        process.exit(EXIT_USAGE);
       }
 
       const { note: fileNote } = manifestEntry;
-      const targetHz = noteToTargetHz(fileNote);
+      
+      // Wrap noteToTargetHz to catch invalid note errors
+      let targetHz: number;
+      try {
+        targetHz = noteToTargetHz(fileNote);
+      } catch {
+        throw errors.invalidNote(fileNote);
+      }
 
-      // Decode audio file to PCM16 mono at source rate
-      const { data: pcm16, srcHz } = await decodePCM16Mono(file);
+      // Decode with better error handling
+      let pcm16: Int16Array;
+      let srcHz: number;
+      try {
+        const decoded = await decodePCM16Mono(file);
+        pcm16 = decoded.data;
+        srcHz = decoded.srcHz;
+      } catch (error) {
+        // Map node-io errors to CLI errors
+        if (error instanceof Error) {
+          if (error.message.includes('channels')) {
+            const match = error.message.match(/(\d+) channels/);
+            const channels = match ? parseInt(match[1]) : 2;
+            throw errors.nonMono(file, channels);
+          }
+          if (error.message.includes('file not found')) {
+            throw errors.fileNotFound(file);
+          }
+          throw errors.unsupportedAudio(file);
+        }
+        throw errors.unreadableFile(file);
+      }
+
+      if (pcm16.length === 0) {
+        throw errors.emptyAudio(file);
+      }
 
       // Validate mono (decodePCM16Mono already does this, but keep for safety)
       validateMonoPcm16(pcm16, 1);
@@ -244,18 +315,20 @@ async function main() {
       if (srcHz !== targetHz) {
         if (resampler === "ffmpeg") {
           resampledPcm16 = await decodeAndResampleToPcm16(file, targetHz);
+        } else if (resampler === "zoh" && resamplerInstance) {
+          resampledPcm16 = resamplerInstance.resamplePCM16(pcm16, srcHz, targetHz);
         } else if (resampler === "wasm" && resamplerInstance) {
           resampledPcm16 = resamplerInstance.resamplePCM16(pcm16, srcHz, targetHz);
         } else if (resampler === "wasm" && !resamplerInstance) {
           // WASM requested but not available (testing scenario) - use ffmpeg as fallback
           if (verbose) {
-            console.log(`WASM resampler not available, using ffmpeg fallback for ${file}`);
+            console.error(`WASM resampler not available, using ffmpeg fallback for ${file}`);
           }
           resampledPcm16 = await decodeAndResampleToPcm16(file, targetHz);
         } else {
           // Fallback: assume input is already at target rate
           if (verbose) {
-            console.log(`Warning: Input rate ${srcHz}Hz != target ${targetHz}Hz, but no resampler available`);
+            console.error(`Warning: Input rate ${srcHz}Hz != target ${targetHz}Hz, but no resampler available`);
           }
         }
       }
@@ -265,6 +338,11 @@ async function main() {
       const sampleLength = sampleData.length;
       const paddedLength = alignTo256(sampleLength);
 
+      if (sampleLength > 0xFFFF) {
+        const segmentLabel = path.basename(file, path.extname(file));
+        console.warn(warnings.oversize(segmentLabel, sampleLength));
+      }
+
       // Calculate offsets
       const startByte = currentOffset;
       const startOffsetHex = Math.floor(startByte / 256)
@@ -272,8 +350,22 @@ async function main() {
         .toUpperCase()
         .padStart(2, "0");
 
+      const label = path.basename(file, path.extname(file));
+
+      if (verbose) {
+        console.error(`  Source rate: ${srcHz}Hz`);
+        console.error(`  Target rate: ${targetHz}Hz`);
+        console.error(`  Samples: ${pcm16.length} -> ${resampledPcm16.length}`);
+        console.error(`  8-bit length: ${sampleLength} bytes`);
+        console.error(`  Padded length: ${paddedLength} bytes`);
+        console.error(`  Start offset: 0x${startOffsetHex}`);
+        if (resamplerInstance) {
+          console.error(`  Resampler: ${resamplerInstance.meta.name} v${resamplerInstance.meta.version}`);
+        }
+      }
+
       segments.push({
-        label: path.basename(file, path.extname(file)),
+        label,
         note: fileNote,
         targetHz,
         startByte,
@@ -293,8 +385,11 @@ async function main() {
       }
 
     } catch (error) {
-      console.error(`Error processing ${file}: ${error instanceof Error ? error.message : String(error)}`);
-      process.exit(1);
+      if (error instanceof CliError) {
+        console.error(error.message);
+        process.exit(error.exitCode);
+      }
+      throw error;
     }
   }
 
@@ -315,15 +410,19 @@ async function main() {
 
   // Check if output exists and --force is not set
   if (fs.existsSync(outputPath) && !force) {
-    console.error(`Error: Output file ${outputPath} already exists. Use --force to overwrite.`);
-    process.exit(1);
+    console.warn(warnings.overwrite(outputPath));
+    process.exit(0);
   }
 
   // Create 8SVX file
-  await createEightSVXFile(outputPath, segments, mode);
+  try {
+    await createEightSVXFile(outputPath, segments, mode);
+  } catch {
+    throw errors.writeFailed(outputPath);
+  }
 
   if (verbose) {
-    console.log(`Created ${outputPath}`);
+    console.error(`Created ${outputPath}`);
   }
 
   // Write report if requested
@@ -355,7 +454,7 @@ async function main() {
     fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
 
     if (verbose) {
-      console.log(`Created ${reportPath}`);
+      console.error(`Created ${reportPath}`);
     }
   }
 
@@ -470,6 +569,10 @@ async function createEightSVXFile(
 }
 
 main().catch((error) => {
-  console.error("Error:", error.message);
+  if (error instanceof CliError) {
+    console.error(error.message);
+    process.exit(error.exitCode);
+  }
+  console.error("Error:", error instanceof Error ? error.message : String(error));
   process.exit(1);
 });

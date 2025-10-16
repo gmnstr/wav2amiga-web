@@ -1,0 +1,29 @@
+{
+  "name": "@wav2amiga/resampler-zoh",
+  "version": "1.0.0",
+  "description": "Zero-order hold (ZOH) resampler for wav2amiga - preserves transients without interpolation",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "exports": {
+    ".": {
+      "node": "./dist/index.js",
+      "browser": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "test": "vitest run"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "vitest": "^2.0.0",
+    "typescript": "5.6.3",
+    "@wav2amiga/core": "workspace:*"
+  },
+  "files": [
+    "dist"
+  ]
+}

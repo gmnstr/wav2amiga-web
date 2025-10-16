@@ -7,16 +7,16 @@ interface VersionInfo {
 }
 
 interface LibsamplerateExports {
-  malloc(size: number): number;
-  free(ptr: number): void;
+  malloc(_size: number): number;
+  free(_ptr: number): void;
   src_simple(
-    data_in: number,
-    input_frames: number,
-    data_out: number,
-    output_frames: number,
-    input_rate: number,
-    output_rate: number,
-    channels: number
+    _data_in: number,
+    _input_frames: number,
+    _data_out: number,
+    _output_frames: number,
+    _input_rate: number,
+    _output_rate: number,
+    _channels: number
   ): number;
   SRC_SINC_BEST_QUALITY: number;
   memory?: WebAssembly.Memory;
@@ -121,7 +121,7 @@ export async function createWasmResampler(): Promise<ResampleAPI> {
   try {
     const module = await WebAssembly.instantiate(wasmBytes);
     instance = module.instance as WebAssembly.Instance & { exports: LibsamplerateExports };
-  } catch (error) {
+  } catch {
     const module = await WebAssembly.instantiate(wasmBytes);
     instance = module.instance as WebAssembly.Instance & { exports: LibsamplerateExports };
   }

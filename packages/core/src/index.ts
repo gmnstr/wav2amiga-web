@@ -69,7 +69,7 @@ export const PAL_PERIODS: Record<string, number> = {
 export function noteToTargetHz(note: string): number {
   const period = PAL_PERIODS[note];
   if (period === undefined) {
-    throw new Error(`Invalid note: ${note}`);
+    throw new Error(`'${note}' is not a valid ProTracker note`);
   }
   // PAL clock is 3546895 Hz, target rate = clock / period
   // Using floor for deterministic behavior
@@ -131,7 +131,7 @@ export function calculateStackedEqualLayout(
  */
 export function validateMonoPcm16(input: Int16Array, channels: number): void {
   if (channels !== 1) {
-    throw new Error(`Input must be mono (1 channel), got ${channels} channels`);
+    throw new Error(`${channels} channels detected, expected 1 (mono)`);
   }
 }
 

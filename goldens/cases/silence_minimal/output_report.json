@@ -1,0 +1,32 @@
+{
+  "mode": "single",
+  "outputFile": "output.8SVX",
+  "segments": [
+    {
+      "label": "input",
+      "note": "C-2",
+      "targetHz": 8287,
+      "startByte": 0,
+      "startOffsetHex": "00",
+      "lengthBytes": 4,
+      "paddedLengthBytes": 256,
+      "paddedLength": 256,
+      "sampleData": {
+        "0": 225,
+        "1": 225,
+        "2": 127,
+        "3": 127
+      }
+    }
+  ],
+  "versions": {
+    "node": "v20.19.5",
+    "pnpm": "unknown",
+    "ffmpeg": "unknown",
+    "resampler": {
+      "name": "zoh",
+      "version": "1.0.0"
+    },
+    "git": "unknown"
+  }
+}

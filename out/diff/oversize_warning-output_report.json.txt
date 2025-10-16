@@ -1,0 +1,10 @@
+Golden drift detected for oversize_warning/output_report.json
+First difference @ byte 1813721 (0x1BACD9)
+Expected byte: 0x35
+Actual   byte: 0x30
+Expected snippet: 65 72 73 69 6F 6E 73 22 3A 20 7B 0A 20 20 20 20 22 6E 6F 64 65 22 3A 20 22 76 32 30 2E 31 39 2E 35 22 2C 0A 20 20 20 20 22 70 6E 70 6D 22 3A 20 22 75 6E 6B 6E 6F 77 6E 22 2C 0A 20 20 20 20 22
+Actual snippet:   65 72 73 69 6F 6E 73 22 3A 20 7B 0A 20 20 20 20 22 6E 6F 64 65 22 3A 20 22 76 32 30 2E 31 39 2E 30 22 2C 0A 20 20 20 20 22 70 6E 70 6D 22 3A 20 22 75 6E 6B 6E 6F 77 6E 22 2C 0A 20 20 20 20 22
+
+Full file comparison:
+Expected length: 1813871 bytes
+Actual length:   1813871 bytes

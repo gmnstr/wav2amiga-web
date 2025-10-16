@@ -1,0 +1,5 @@
+[
+  { "filepath": "goldens/cases/stacked_offsets/input_a.wav", "note": "C-2" },
+  { "filepath": "goldens/cases/stacked_offsets/input_b.wav", "note": "C-2" },
+  { "filepath": "goldens/cases/stacked_offsets/input_c.wav", "note": "C-2" }
+]
