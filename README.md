@@ -61,6 +61,16 @@ pnpm test
 pnpm test:golden:zoh
 ```
 
+### Web dev server
+```bash
+pnpm run web:start   # http://localhost:5173
+pnpm run web:stop
+pnpm run web:status
+# logs: out/logs/web-dev.log
+```
+
+> Requires bash (macOS/Linux). On Windows, use Git Bash or WSL.
+
 ## Architecture
 
 - **packages/core**: Pure TypeScript business logic
