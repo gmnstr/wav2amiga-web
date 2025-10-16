@@ -164,8 +164,6 @@ function compareReports(expectedReportPath, actualReportPath) {
   const actualStable = JSON.stringify(stableSort(actual));
 
   if (expectedStable !== actualStable) {
-    console.error("Expected report:", JSON.stringify(expected, null, 2));
-    console.error("Actual report:", JSON.stringify(actual, null, 2));
     throw new Error("Report JSON mismatch");
   }
 }
