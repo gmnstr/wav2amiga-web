@@ -11,8 +11,8 @@
   },
   "dependencies": {
     "@wav2amiga/core": "workspace:*",
-    "@wav2amiga/resampler-wasm": "workspace:*",
     "@wav2amiga/resampler-zoh": "workspace:*",
+    "fflate": "^0.8.2",
     "lucide-react": "^0.545.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"

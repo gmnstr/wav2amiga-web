@@ -1,11 +1,53 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Upload, X, HelpCircle, ChevronDown, ChevronUp, Download, FileArchive } from 'lucide-react';
-import { parseWavPcm16Mono } from '../wav';
-import type { ConvertMsg, ResultMsg, ErrorMsg } from '../worker';
+import React, { useState, useRef, useEffect } from "react";
+import { Upload, X, HelpCircle, ChevronDown, ChevronUp, Download, FileArchive } from "lucide-react";
+import { strToU8, zipSync } from "fflate";
+import {
+  convert,
+  generateSingleFilename,
+  type AudioInput,
+  type SegmentInfo,
+} from "@wav2amiga/core";
+import { parseWavPcm16Mono } from "../wav";
+import type { ConvertMsg, ResultMsg, ErrorMsg } from "../worker";
 
-const PAL_NOTES = ['C-1', 'C#1', 'D-1', 'D#1', 'E-1', 'F-1', 'F#1', 'G-1', 'G#1', 'A-1', 'A#1', 'B-1',
-                   'C-2', 'C#2', 'D-2', 'D#2', 'E-2', 'F-2', 'F#2', 'G-2', 'G#2', 'A-2', 'A#2', 'B-2',
-                   'C-3', 'C#3', 'D-3', 'D#3', 'E-3', 'F-3', 'F#3', 'G-3', 'G#3', 'A-3', 'A#3', 'B-3'];
+const PAL_NOTES = [
+  "C-1",
+  "C#1",
+  "D-1",
+  "D#1",
+  "E-1",
+  "F-1",
+  "F#1",
+  "G-1",
+  "G#1",
+  "A-1",
+  "A#1",
+  "B-1",
+  "C-2",
+  "C#2",
+  "D-2",
+  "D#2",
+  "E-2",
+  "F-2",
+  "F#2",
+  "G-2",
+  "G#2",
+  "A-2",
+  "A#2",
+  "B-2",
+  "C-3",
+  "C#3",
+  "D-3",
+  "D#3",
+  "E-3",
+  "F-3",
+  "F#3",
+  "G-3",
+  "G#3",
+  "A-3",
+  "A#3",
+  "B-3",
+];
 
 interface FileData {
   id: string;
@@ -19,6 +61,7 @@ interface FileData {
 }
 
 interface ConversionResult {
+  mode: "single" | "stacked" | "stacked-equal";
   outputName: string;
   data: Uint8Array;
   segments: Array<{
@@ -36,12 +79,126 @@ interface ConversionResult {
   resampler: string;
 }
 
+interface DownloadReport {
+  mode: "single" | "stacked" | "stacked-equal";
+  outputFile: string;
+  segments: ConversionResult["segments"];
+  versions: {
+    browser: string;
+    resampler: {
+      name: string;
+      version: string;
+    };
+  };
+}
+
+function stripExtension(name: string): string {
+  return name.replace(/\.[^/.]+$/, "");
+}
+
+function createEightSVXFile(segments: SegmentInfo[], bodyBytes: Uint8Array): Uint8Array {
+  if (segments.length === 0) {
+    throw new Error("no segments to write");
+  }
+
+  const name = "wav2amiga";
+  const nameChunkSize = (name.length + 1) & ~1;
+  const bodySize = segments.reduce((sum, segment) => sum + segment.paddedLengthBytes, 0);
+  const totalSize = 12 + 28 + (8 + nameChunkSize) + 8 + bodySize;
+
+  const buffer = new ArrayBuffer(totalSize);
+  const view = new DataView(buffer);
+  let pos = 0;
+
+  view.setUint32(pos, 0x464f524d, false);
+  view.setUint32(pos + 4, totalSize - 8, false);
+  view.setUint32(pos + 8, 0x38535658, false);
+  pos += 12;
+
+  view.setUint32(pos, 0x56484452, false);
+  view.setUint32(pos + 4, 20, false);
+  view.setUint32(pos + 8, 0, false);
+  view.setUint32(pos + 12, 0, false);
+  view.setUint32(pos + 16, 0, false);
+  view.setUint32(pos + 20, segments[0]?.targetHz ?? 0, false);
+  view.setUint16(pos + 24, 1, false);
+  view.setUint16(pos + 26, 0, false);
+  pos += 28;
+
+  view.setUint32(pos, 0x4e414d45, false);
+  view.setUint32(pos + 4, nameChunkSize, false);
+  for (let i = 0; i < name.length; i++) {
+    view.setUint8(pos + 8 + i, name.charCodeAt(i));
+  }
+  pos += 8 + nameChunkSize;
+
+  view.setUint32(pos, 0x424f4459, false);
+  view.setUint32(pos + 4, bodySize, false);
+  pos += 8;
+
+  for (let i = 0; i < bodyBytes.length; i++) {
+    view.setUint8(pos + i, bodyBytes[i]);
+  }
+
+  return new Uint8Array(buffer);
+}
+
+function buildReportSegments(
+  segments: SegmentInfo[],
+  bodyBytes: Uint8Array,
+): ConversionResult["segments"] {
+  return segments.map((segment) => {
+    const sampleData: { [key: string]: number } = {};
+    const start = segment.startByte;
+    for (let i = 0; i < segment.lengthBytes; i++) {
+      sampleData[i.toString()] = bodyBytes[start + i];
+    }
+
+    return {
+      ...segment,
+      paddedLength: segment.paddedLengthBytes,
+      sampleData,
+    };
+  });
+}
+
+function extractBodyChunk(data: Uint8Array): Uint8Array {
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  let pos = 12;
+
+  while (pos + 8 <= data.byteLength) {
+    const chunkId = view.getUint32(pos, false);
+    const chunkSize = view.getUint32(pos + 4, false);
+    const chunkDataStart = pos + 8;
+    const chunkDataEnd = chunkDataStart + chunkSize;
+
+    if (chunkId === 0x424f4459) {
+      if (chunkDataEnd > data.byteLength) {
+        throw new Error("invalid 8SVX BODY chunk");
+      }
+      return data.subarray(chunkDataStart, chunkDataEnd);
+    }
+
+    pos = chunkDataStart + ((chunkSize + 1) & ~1);
+  }
+
+  throw new Error("missing BODY chunk in 8SVX file");
+}
+
+function toSigned8Pcm(input: Uint8Array): Uint8Array {
+  const output = new Uint8Array(input.length);
+  for (let i = 0; i < input.length; i++) {
+    output[i] = input[i] ^ 0x80;
+  }
+  return output;
+}
+
 export default function Wav2AmigaWeb() {
   const [files, setFiles] = useState<FileData[]>([]);
-  const [mode, setMode] = useState<'single' | 'stacked' | 'stacked-equal'>('stacked');
+  const [mode, setMode] = useState<"single" | "stacked" | "stacked-equal" | "batch">("stacked");
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [processingProgress, setProcessingProgress] = useState('');
+  const [processingProgress, setProcessingProgress] = useState("");
   const [result, setResult] = useState<ConversionResult | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
@@ -51,44 +208,48 @@ export default function Wav2AmigaWeb() {
 
   // Initialize worker
   useEffect(() => {
-    workerRef.current = new Worker(new URL('../worker.ts', import.meta.url), { type: 'module' });
-    
+    workerRef.current = new Worker(new URL("../worker.ts", import.meta.url), { type: "module" });
+
     workerRef.current.onmessage = (e: MessageEvent<ResultMsg | ErrorMsg>) => {
-      if (e.data.type === 'result') {
+      if (e.data.type === "result") {
         const result = e.data;
         setResult({
+          mode: result.report.mode,
           outputName: result.filename,
           data: result.output,
           segments: result.report.segments,
-          increment: mode === 'stacked-equal' ? 
-            (result.report.segments.length > 0 ? 
-              (result.report.segments[0].paddedLengthBytes >> 8).toString(16).toUpperCase().padStart(2, '0') : 
-              undefined) : 
-            undefined,
-          resampler: result.report.resampler.name.toUpperCase()
+          increment:
+            result.report.mode === "stacked-equal"
+              ? result.report.segments.length > 0
+                ? (result.report.segments[0].paddedLengthBytes >> 8)
+                    .toString(16)
+                    .toUpperCase()
+                    .padStart(2, "0")
+                : undefined
+              : undefined,
+          resampler: result.report.resampler.name.toUpperCase(),
         });
         setIsProcessing(false);
-        setProcessingProgress('');
-      } else if (e.data.type === 'error') {
-        setError(e.data.message);
+        setProcessingProgress("");
+      } else if (e.data.type === "error") {
+        setError(e.data.error.message);
         setIsProcessing(false);
-        setProcessingProgress('');
+        setProcessingProgress("");
       }
     };
-    
+
     return () => {
       if (workerRef.current) {
         workerRef.current.terminate();
       }
     };
-  }, [mode]);
+  }, []);
 
   const formatBytes = (bytes: number) => {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
   };
-
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -103,7 +264,7 @@ export default function Wav2AmigaWeb() {
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    
+
     const droppedFiles = Array.from(e.dataTransfer.files);
     await addFiles(droppedFiles);
   };
@@ -116,121 +277,243 @@ export default function Wav2AmigaWeb() {
   const addFiles = async (newFiles: File[]) => {
     setError(null);
     const validFiles: FileData[] = [];
-    
-    for (const file of newFiles) {
-      if (!file.name.toLowerCase().endsWith('.wav')) {
+    const incomingFiles = mode === "single" ? newFiles.slice(0, 1) : newFiles;
+
+    if (mode === "single" && newFiles.length > 1) {
+      setError("single mode accepts one file; only the first file was added");
+    }
+
+    for (const file of incomingFiles) {
+      if (!file.name.toLowerCase().endsWith(".wav")) {
         setError(`${file.name}: only WAV files supported`);
         continue;
       }
-      
+
       try {
         const arrayBuffer = await file.arrayBuffer();
         const { pcm16, srcHz } = parseWavPcm16Mono(arrayBuffer, file.name);
-        
+
         validFiles.push({
           id: Math.random().toString(36).substr(2, 9),
           file,
           name: file.name,
           size: file.size,
           sampleRate: srcHz,
-          note: 'C-2',
+          note: "C-2",
           pcm16,
-          srcHz
+          srcHz,
         });
       } catch (err) {
         setError(err instanceof Error ? err.message : `${file.name}: ${String(err)}`);
       }
     }
-    
-    setFiles([...files, ...validFiles]);
+
+    setFiles((prevFiles) => {
+      if (mode === "single") {
+        return validFiles.slice(0, 1);
+      }
+      return [...prevFiles, ...validFiles];
+    });
   };
 
   const removeFile = (id: string) => {
-    setFiles(files.filter(f => f.id !== id));
+    setFiles(files.filter((f) => f.id !== id));
     setResult(null);
   };
 
   const updateNote = (id: string, note: string) => {
-    setFiles(files.map(f => f.id === id ? { ...f, note } : f));
+    setFiles(files.map((f) => (f.id === id ? { ...f, note } : f)));
   };
 
   const handleConvert = async () => {
+    if (mode === "batch") {
+      downloadBatchArchive();
+      return;
+    }
+
     if (files.length === 0) {
-      setError('Please add at least one file');
+      setError("Please add at least one file");
       return;
     }
-    
-    if (mode === 'single' && files.length > 1) {
-      setError('single mode requires exactly 1 input file');
+
+    if (mode === "single" && files.length > 1) {
+      setError("single mode requires exactly 1 input file");
       return;
     }
-    
+
     if (!workerRef.current) {
-      setError('Worker not initialized');
+      setError("Worker not initialized");
       return;
     }
-    
+
     setIsProcessing(true);
     setError(null);
     setResult(null);
-    setProcessingProgress('Converting...');
-    
+    setProcessingProgress("Converting...");
+
     try {
       const convertMsg: ConvertMsg = {
-        type: 'convert',
-        files: files.map(f => ({
+        type: "convert",
+        files: files.map((f) => ({
           name: f.name,
           pcm16: f.pcm16,
           srcHz: f.srcHz,
-          note: f.note
+          note: f.note,
         })),
-        mode
+        mode,
       };
-      
+
       // Transfer ArrayBuffers to avoid copying
-      const transferBuffers = files.flatMap(f => [f.pcm16.buffer]);
+      const transferBuffers = files.flatMap((f) => [f.pcm16.buffer]);
       workerRef.current.postMessage(convertMsg, transferBuffers);
-      
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setIsProcessing(false);
-      setProcessingProgress('');
+      setProcessingProgress("");
     }
   };
 
   const downloadFile = (filename: string, data: Uint8Array) => {
-    const blob = new Blob([data], { type: 'application/octet-stream' });
+    const bytes =
+      data.byteOffset === 0 && data.byteLength === data.buffer.byteLength ? data : data.slice();
+    const blob = new Blob([bytes.buffer as ArrayBuffer], {
+      type: "application/octet-stream",
+    });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
   };
 
-  const downloadReport = () => {
-    if (!result) return;
-    
-    const report = {
-      mode,
+  const createDownloadReport = (): DownloadReport | null => {
+    if (!result) return null;
+
+    return {
+      mode: result.mode,
       outputFile: result.outputName,
       segments: result.segments,
       versions: {
         browser: navigator.userAgent,
         resampler: {
-          name: 'zoh',
-          version: '1.0.0'
-        }
-      }
+          name: "zoh",
+          version: "1.0.0",
+        },
+      },
     };
-    
+  };
+
+  const downloadReport = () => {
+    if (!result) return;
+    const report = createDownloadReport();
+    if (!report) return;
+
     const json = JSON.stringify(report, null, 2);
-    const reportFilename = result.outputName.replace('.8SVX', '_report.json');
+    const reportFilename = result.outputName.replace(".8SVX", "_report.json");
     downloadFile(reportFilename, new TextEncoder().encode(json));
   };
 
   const downloadArchive = () => {
-    setError('TODO: ZIP support (fflate)');
+    if (!result) return;
+
+    try {
+      const report = createDownloadReport();
+      if (!report) return;
+
+      const reportJson = JSON.stringify(report, null, 2);
+      const reportFilename = result.outputName.replace(".8SVX", "_report.json");
+      const archiveName = result.outputName.replace(".8SVX", ".zip");
+
+      const archiveData = zipSync({
+        [result.outputName]: result.data,
+        [reportFilename]: strToU8(reportJson),
+      });
+
+      downloadFile(archiveName, archiveData);
+      setError(null);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? `Failed to create archive: ${err.message}`
+          : "Failed to create archive",
+      );
+    }
+  };
+
+  const downloadProtracker8svx = () => {
+    if (!result) return;
+
+    try {
+      const body = extractBodyChunk(result.data);
+      const signedBody = toSigned8Pcm(body);
+      downloadFile(result.outputName, signedBody);
+      setError(null);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? `Failed to export ProTracker .8SVX: ${err.message}`
+          : "Failed to export ProTracker .8SVX",
+      );
+    }
+  };
+
+  const downloadBatchArchive = () => {
+    if (files.length === 0) {
+      setError("Please add at least one file");
+      return;
+    }
+
+    setIsProcessing(true);
+    setProcessingProgress("Building batch archive...");
+
+    try {
+      const zipEntries: Record<string, Uint8Array> = {};
+
+      for (const file of files) {
+        const label = stripExtension(file.name);
+        const input: AudioInput = {
+          pcm16: file.pcm16,
+          label,
+          note: file.note,
+          sourceHz: file.srcHz,
+        };
+
+        const convertResult = convert([input], { mode: "single" });
+        const outputName = generateSingleFilename(label);
+        const outputData = toSigned8Pcm(convertResult.outputBytes);
+        const report = {
+          mode: "single",
+          outputFile: outputName,
+          segments: buildReportSegments(convertResult.segments, convertResult.outputBytes),
+          versions: {
+            browser: navigator.userAgent,
+            resampler: {
+              name: convertResult.resampler.name.toLowerCase(),
+              version: convertResult.resampler.version,
+            },
+          },
+        };
+
+        zipEntries[outputName] = outputData;
+        zipEntries[outputName.replace(".8SVX", "_report.json")] = strToU8(
+          JSON.stringify(report, null, 2),
+        );
+      }
+
+      const archiveData = zipSync(zipEntries);
+      downloadFile("batch_single_outputs.zip", archiveData);
+      setError(null);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? `Failed to create batch archive: ${err.message}`
+          : "Failed to create batch archive",
+      );
+    } finally {
+      setIsProcessing(false);
+      setProcessingProgress("");
+    }
   };
 
   return (
@@ -239,7 +522,7 @@ export default function Wav2AmigaWeb() {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl font-bold text-white">wav2amiga</h1>
-          <button 
+          <button
             onClick={() => setShowHelp(true)}
             className="flex items-center gap-2 px-4 py-2 text-gray-300 hover:bg-gray-800 rounded-lg transition"
           >
@@ -262,20 +545,24 @@ export default function Wav2AmigaWeb() {
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
           className={`mb-6 p-12 border-2 border-dashed rounded-lg cursor-pointer transition ${
-            isDragging 
-              ? 'border-blue-400 bg-blue-950' 
-              : 'border-gray-700 bg-gray-800 hover:border-gray-600'
+            isDragging
+              ? "border-blue-400 bg-blue-950"
+              : "border-gray-700 bg-gray-800 hover:border-gray-600"
           }`}
         >
           <div className="flex flex-col items-center gap-3 text-gray-400">
-            <Upload size={48} className={isDragging ? 'text-blue-400' : 'text-gray-500'} />
+            <Upload size={48} className={isDragging ? "text-blue-400" : "text-gray-500"} />
             <p className="text-lg font-medium">Drop WAV files here or click to browse</p>
-            <p className="text-sm">Only WAV PCM16 mono supported</p>
+            <p className="text-sm">
+              Only WAV PCM16 mono supported
+              {mode === "single" ? " (single mode: one file)" : ""}
+              {mode === "batch" ? " (batch mode: one output per input in ZIP)" : ""}
+            </p>
           </div>
           <input
             ref={fileInputRef}
             type="file"
-            multiple
+            multiple={mode !== "single"}
             accept=".wav"
             onChange={handleFileSelect}
             className="hidden"
@@ -290,8 +577,12 @@ export default function Wav2AmigaWeb() {
               <input
                 type="radio"
                 value="single"
-                checked={mode === 'single'}
-                onChange={(e) => setMode(e.target.value)}
+                checked={mode === "single"}
+                onChange={() => {
+                  setMode("single");
+                  setFiles((prevFiles) => prevFiles.slice(0, 1));
+                  setResult(null);
+                }}
                 className="w-4 h-4"
               />
               <span>Single</span>
@@ -300,8 +591,8 @@ export default function Wav2AmigaWeb() {
               <input
                 type="radio"
                 value="stacked"
-                checked={mode === 'stacked'}
-                onChange={(e) => setMode(e.target.value)}
+                checked={mode === "stacked"}
+                onChange={() => setMode("stacked")}
                 className="w-4 h-4"
               />
               <span>Stacked</span>
@@ -310,11 +601,24 @@ export default function Wav2AmigaWeb() {
               <input
                 type="radio"
                 value="stacked-equal"
-                checked={mode === 'stacked-equal'}
-                onChange={(e) => setMode(e.target.value)}
+                checked={mode === "stacked-equal"}
+                onChange={() => setMode("stacked-equal")}
                 className="w-4 h-4"
               />
               <span>Stacked Equal</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer text-gray-300">
+              <input
+                type="radio"
+                value="batch"
+                checked={mode === "batch"}
+                onChange={() => {
+                  setMode("batch");
+                  setResult(null);
+                }}
+                className="w-4 h-4"
+              />
+              <span>Batch</span>
             </label>
           </div>
         </div>
@@ -340,8 +644,10 @@ export default function Wav2AmigaWeb() {
                       onChange={(e) => updateNote(file.id, e.target.value)}
                       className="px-3 py-1 border border-gray-600 rounded bg-gray-700 text-gray-200 text-sm"
                     >
-                      {PAL_NOTES.map(note => (
-                        <option key={note} value={note}>{note}</option>
+                      {PAL_NOTES.map((note) => (
+                        <option key={note} value={note}>
+                          {note}
+                        </option>
                       ))}
                     </select>
                     <button
@@ -364,7 +670,7 @@ export default function Wav2AmigaWeb() {
             disabled={isProcessing || files.length === 0}
             className="px-8 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed transition"
           >
-            {isProcessing ? processingProgress : 'Convert'}
+            {isProcessing ? processingProgress : mode === "batch" ? "Create Batch ZIP" : "Convert"}
           </button>
         </div>
 
@@ -380,7 +686,8 @@ export default function Wav2AmigaWeb() {
                 <div className="flex-1">
                   <p className="font-medium text-white">{result.outputName}</p>
                   <p className="text-sm text-gray-400">
-                    {result.segments.length} sample{result.segments.length > 1 ? 's' : ''} • {formatBytes(result.data.length)} • {result.resampler} resampler
+                    {result.segments.length} sample{result.segments.length > 1 ? "s" : ""} •{" "}
+                    {formatBytes(result.data.length)} • {result.resampler} resampler
                   </p>
                 </div>
               </div>
@@ -398,27 +705,38 @@ export default function Wav2AmigaWeb() {
                   <p className="font-medium text-gray-300 mb-2">Sample Offsets (hex):</p>
                   <ul className="space-y-1 text-gray-400 mb-3">
                     {result.segments.map((segment, i) => (
-                      <li key={i}>• {segment.label}: {segment.startOffsetHex}</li>
+                      <li key={i}>
+                        • {segment.label}: {segment.startOffsetHex}
+                      </li>
                     ))}
                   </ul>
                   {result.increment && (
                     <p className="text-gray-400">
-                      <span className="font-medium">Increment (Stacked Equal):</span> {result.increment}
+                      <span className="font-medium">Increment (Stacked Equal):</span>{" "}
+                      {result.increment}
                     </p>
                   )}
                   <p className="text-gray-400 mt-2">
-                    <span className="font-medium">Resampler:</span> {result.resampler} (deterministic)
+                    <span className="font-medium">Resampler:</span> {result.resampler}{" "}
+                    (deterministic)
                   </p>
                 </div>
               )}
 
               <div className="flex flex-wrap gap-3">
                 <button
+                  onClick={downloadProtracker8svx}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg transition"
+                >
+                  <Download size={16} />
+                  Download .8SVX (ProTracker)
+                </button>
+                <button
                   onClick={() => downloadFile(result.outputName, result.data)}
                   className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg transition"
                 >
                   <Download size={16} />
-                  Download .8SVX
+                  Download IFF 8SVX
                 </button>
                 <button
                   onClick={downloadReport}
@@ -453,38 +771,64 @@ export default function Wav2AmigaWeb() {
                     <X size={24} className="text-gray-400" />
                   </button>
                 </div>
-                
+
                 <div className="space-y-4 text-gray-300">
                   <section>
                     <h3 className="font-semibold text-lg mb-2 text-white">Supported Files</h3>
-                    <p>Only WAV files with PCM16 mono format are supported. This ensures deterministic conversion that matches the CLI output byte-for-byte.</p>
+                    <p>
+                      Only WAV files with PCM16 mono format are supported. This ensures
+                      deterministic conversion that matches the CLI output byte-for-byte.
+                    </p>
                   </section>
-                  
+
                   <section>
                     <h3 className="font-semibold text-lg mb-2 text-white">Modes</h3>
                     <ul className="list-disc list-inside space-y-1">
-                      <li><strong className="text-white">Single:</strong> Convert one file to one 8SVX sample</li>
-                      <li><strong className="text-white">Stacked:</strong> Combine multiple files into one 8SVX with consecutive offsets</li>
-                      <li><strong className="text-white">Stacked Equal:</strong> Like stacked, but with equal-sized slots for each sample</li>
+                      <li>
+                        <strong className="text-white">Single:</strong> Convert one file to one 8SVX
+                        sample
+                      </li>
+                      <li>
+                        <strong className="text-white">Stacked:</strong> Combine multiple files into
+                        one 8SVX with consecutive offsets
+                      </li>
+                      <li>
+                        <strong className="text-white">Stacked Equal:</strong> Like stacked, but
+                        with equal-sized slots for each sample
+                      </li>
                     </ul>
                   </section>
-                  
+
                   <section>
                     <h3 className="font-semibold text-lg mb-2 text-white">Note Selection</h3>
-                    <p>Choose the Amiga period-based note for each sample. C-2 ≈ 8287 Hz (common ProTracker base note).</p>
+                    <p>
+                      Choose the Amiga period-based note for each sample. C-2 ≈ 8287 Hz (common
+                      ProTracker base note).
+                    </p>
                   </section>
-                  
+
                   <section>
                     <h3 className="font-semibold text-lg mb-2 text-white">ZOH Resampler</h3>
-                    <p>Uses Zero-Order Hold resampling to preserve transients without interpolation or low-pass filtering, matching Paula chip sample-and-hold behavior.</p>
+                    <p>
+                      Uses Zero-Order Hold resampling to preserve transients without interpolation
+                      or low-pass filtering, matching Paula chip sample-and-hold behavior.
+                    </p>
                   </section>
-                  
+
                   <section>
                     <h3 className="font-semibold text-lg mb-2 text-white">Downloads</h3>
                     <ul className="list-disc list-inside space-y-1">
-                      <li><strong className="text-white">.8SVX:</strong> The converted Amiga sample file</li>
-                      <li><strong className="text-white">Report:</strong> JSON file with conversion metadata</li>
-                      <li><strong className="text-white">Archive:</strong> ZIP containing both files</li>
+                      <li>
+                        <strong className="text-white">.8SVX:</strong> The converted Amiga sample
+                        file
+                      </li>
+                      <li>
+                        <strong className="text-white">Report:</strong> JSON file with conversion
+                        metadata
+                      </li>
+                      <li>
+                        <strong className="text-white">Archive:</strong> ZIP containing both files
+                      </li>
                     </ul>
                   </section>
                 </div>

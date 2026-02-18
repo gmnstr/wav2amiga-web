@@ -19,9 +19,9 @@ if [[ -f "$PID_FILE" ]]; then
   fi
 fi
 
-# Start Vite dev server in background on :5173
-nohup pnpm -w --filter @wav2amiga/web dev -- --host --port 5173 >>"$LOG_FILE" 2>&1 &
+# Start Vite dev server in background (uses apps/web/vite.config.ts)
+nohup pnpm -w --filter @wav2amiga/web dev >>"$LOG_FILE" 2>&1 &
 echo $! > "$PID_FILE"
 
-echo "Web dev server starting on http://localhost:5173 (pid $(cat "$PID_FILE"))."
+echo "Web dev server starting on http://localhost:3000/ (pid $(cat "$PID_FILE"))."
 echo "Logs: $LOG_FILE"
