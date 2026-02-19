@@ -8,3 +8,6 @@ coverage/
 
 # Test artifacts (regenerated on test runs)
 /out/
+
+# Archive folder
+.archive/
