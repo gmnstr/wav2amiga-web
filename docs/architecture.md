@@ -26,16 +26,7 @@ Wav2Amiga-Web is a TypeScript monorepo that converts WAV audio files to Amiga 8S
   - Preserves transients and sharp attacks
   - Matches Amiga Paula chip sample-and-hold behavior
 - **Dependencies**: None (pure TypeScript)
-- **Key Exports**: `ZOHResampler`, resampling functions
-
-#### `packages/resampler-wasm`
-- **Purpose**: WebAssembly-based resampler (optional)
-- **Responsibilities**:
-  - High-quality resampling using libsamplerate
-  - Cross-platform deterministic output
-  - Browser and Node.js compatibility
-- **Dependencies**: WASM binary, libsamplerate
-- **Key Exports**: WASM resampler interface
+- **Key Exports**: `createZohResampler()`, `getResamplerInfo()`
 
 #### `packages/node-io`
 - **Purpose**: Node.js adapters for file I/O and audio processing
@@ -95,23 +86,18 @@ Raw Output → Filename Generation → .8SVX File + JSON Report
 
 ## Resampler Strategy
 
-### ZOH (Zero-Order Hold) - Default
+### ZOH (Zero-Order Hold) — Canonical
 - **Algorithm**: No interpolation, preserves sharp attacks
 - **Determinism**: Pure integer math, byte-identical across platforms
 - **Use Case**: ProTracker samples, transient preservation
 - **Performance**: Fast, no external dependencies
+- **Notes**: Default for all surfaces; metadata exposed via `getResamplerInfo()`
 
 ### FFmpeg (Optional)
 - **Algorithm**: Interpolated resampling with low-pass filtering
-- **Determinism**: Platform-dependent, used for comparison
-- **Use Case**: Alternative resampling for comparison
+- **Determinism**: Platform-dependent, used only for explicit parity tests
+- **Use Case**: Alternative resampling comparison during validation
 - **Performance**: Slower, requires FFmpeg binary
-
-### WASM (Optional)
-- **Algorithm**: libsamplerate SINC_BEST_QUALITY
-- **Determinism**: Cross-platform with same WASM binary
-- **Use Case**: High-quality resampling in browser
-- **Performance**: Medium, requires WASM loading
 
 ## File Organization
 

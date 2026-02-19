@@ -18,6 +18,8 @@ import {
   validateMonoPcm16,
   ResampleAPI,
   ResamplerMeta,
+  writeRaw8,
+  getResamplerInfo,
 } from "../index";
 
 describe("mapPcm16To8Bit", () => {
@@ -277,8 +279,35 @@ describe("buildStackedEqual", () => {
     const result = buildStackedEqual([part1, part2]);
 
     expect(result.slot).toBe(512);
-    expect(result.starts).toEqual([0, 512]);
-    expect(result.output.length).toBe(1024); // 2 * 512
+    expect(result.starts).toEqual([0, 256]);
+    expect(result.output.length).toBe(768); // 256 + 512
+  });
+});
+
+describe("writeRaw8", () => {
+  it("aligns stacked parts and fills padding with 0x80", () => {
+    const part1 = new Uint8Array([1, 2]);
+    const part2 = new Uint8Array([3]);
+
+    const result = writeRaw8([part1, part2], "stacked");
+
+    expect(result.starts).toEqual([0, 256]);
+    expect(result.bytes.length).toBe(512);
+    expect(result.bytes[0]).toBe(1);
+    expect(result.bytes[1]).toBe(2);
+    expect(result.bytes[256]).toBe(3);
+    expect(result.bytes[2]).toBe(0x80);
+  });
+
+  it("returns slot size for stacked-equal", () => {
+    const part1 = new Uint8Array([1, 2, 3]);
+    const part2 = new Uint8Array([4, 5, 6, 7]);
+
+    const result = writeRaw8([part1, part2], "stacked-equal");
+
+    expect(result.slot).toBeGreaterThan(0);
+    expect(result.starts).toEqual([0, alignTo256(part1.length)]);
+    expect(result.bytes.length).toBe(alignTo256(part1.length) + alignTo256(part2.length));
   });
 });
 
@@ -318,7 +347,7 @@ describe("ResampleAPI interface", () => {
     // TypeScript interface test - just verify it exists
     const mockApi: ResampleAPI = {
       meta: {
-        name: "wasm",
+        name: "zoh",
         version: "1.0.0",
         sha256: "abc123"
       },
@@ -328,7 +357,7 @@ describe("ResampleAPI interface", () => {
       }
     };
 
-    expect(mockApi.meta.name).toBe("wasm");
+    expect(mockApi.meta.name).toBe("zoh");
     expect(mockApi.meta.version).toBe("1.0.0");
     expect(mockApi.meta.sha256).toBe("abc123");
   });
@@ -343,5 +372,14 @@ describe("ResampleAPI interface", () => {
     expect(mockMeta.name).toBe("ffmpeg");
     expect(mockMeta.version).toBe("6.0.0");
     expect(mockMeta.sha256).toBeUndefined();
+  });
+});
+
+describe("getResamplerInfo", () => {
+  it("returns canonical ZOH metadata", () => {
+    const info = getResamplerInfo();
+    expect(info.name).toBe("ZOH");
+    expect(typeof info.version).toBe("string");
+    expect(info.version.length).toBeGreaterThan(0);
   });
 });

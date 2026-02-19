@@ -1,18 +1,18 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [react()],
-  base: "/wav2amiga-web/app/",
+  base: command === "build" ? "/wav2amiga-web/app/" : "/",
   build: {
     outDir: "dist",
     assetsDir: "assets",
-    assetsInlineLimit: 0, // Ensure WASM files are emitted as separate assets
+    assetsInlineLimit: 0, // Keep binary assets out-of-line for predictable hashing
   },
   worker: {
-    format: 'es'  // ES module workers
+    format: "es", // ES module workers
   },
   server: {
     port: 3000,
   },
-});
+}));

@@ -6,21 +6,21 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { execSync } from "node:child_process";
 import { decodePCM16Mono, decodeAndResampleToPcm16 } from "@wav2amiga/node-io";
-import { createWasmResampler } from "@wav2amiga/resampler-wasm";
-import { createZohResampler } from "@wav2amiga/resampler-zoh";
 import {
-  mapPcm16To8Bit,
-  validateMonoPcm16,
+  convert,
+  getResamplerInfo,
   noteToTargetHz,
-  StackingMode,
+  type AudioInput,
+  type Mode as ConvertMode,
+  type StackingMode,
+  ConversionError,
+  type Report,
+  type ReportSegment,
   generateSingleFilename,
   generateStackedFilename,
   generateStackedEqualFilename,
-  calculateStackedEqualLayout,
-  alignTo256,
-  ResampleAPI,
 } from "@wav2amiga/core";
-import { errors, warnings, EXIT_USAGE, CliError } from "./errors.js";
+import { errors, warnings, EXIT_USAGE, EXIT_PROCESSING, CliError } from "./errors.js";
 
 /**
  * Gets current versions of all toolchain components (matches tools/versions.mjs)
@@ -47,17 +47,14 @@ function getVersions() {
     }
 
     // Get resampler metadata
-    const zohPackagePath = path.join(process.cwd(), "packages", "resampler-zoh", "package.json");
-    if (fs.existsSync(zohPackagePath)) {
-      try {
-        const pkg = JSON.parse(fs.readFileSync(zohPackagePath, "utf-8"));
-        versions.resampler = {
-          name: "zoh",
-          version: pkg.version || "unknown"
-        };
-      } catch (error) {
-        // Ignore resampler version errors
-      }
+    try {
+      const info = getResamplerInfo();
+      versions.resampler = {
+        name: info.name.toLowerCase(),
+        version: info.version ?? "unknown"
+      };
+    } catch {
+      // Ignore resampler version errors
     }
 
     // Get git commit
@@ -73,6 +70,25 @@ function getVersions() {
   }
 
   return versions;
+}
+
+function handleConversionError(error: ConversionError): never {
+  console.error(error.message);
+  const exitCode = mapConversionErrorToExit(error.w2aError.code);
+  process.exit(exitCode);
+}
+
+function mapConversionErrorToExit(code: string | undefined): number {
+  switch (code) {
+    case "w2a/invalid-note":
+    case "w2a/no-inputs":
+    case "w2a/no-mode":
+    case "w2a/invalid-mode":
+    case "w2a/single-multi-input":
+      return EXIT_USAGE;
+    default:
+      return EXIT_PROCESSING;
+  }
 }
 
 // 8SVX file format constants
@@ -125,6 +141,7 @@ interface BODYChunk {
 interface SampleSegment {
   label: string;
   note: string;
+  sourceHz: number;
   targetHz: number;
   startByte: number;
   startOffsetHex: string;
@@ -134,10 +151,7 @@ interface SampleSegment {
   sampleData: Uint8Array; // Actual 8-bit sample data
 }
 
-interface Report {
-  mode: StackingMode;
-  outputFile: string;
-  segments: SampleSegment[];
+interface CliReport extends Report {
   versions: {
     node: string;
     pnpm: string;
@@ -205,8 +219,9 @@ For more information, see README.md`
       default: false,
     })
     .option("resampler", {
-      describe: "Resampler to use (zoh=zero-order hold, no interpolation, preserves transients; ffmpeg=interpolated with low-pass filtering)",
-      choices: ["wasm", "ffmpeg", "zoh"] as const,
+      describe:
+        "Resampler to use (zoh=deterministic zero-order hold; ffmpeg=interpolated via external tooling)",
+      choices: ["ffmpeg", "zoh"] as const,
       default: "zoh",
     })
     .option("force", {
@@ -274,49 +289,29 @@ For more information, see README.md`
   }
 
   // Process files
-  const segments: SampleSegment[] = [];
-  let currentOffset = 0;
+  const convertInputs: AudioInput[] = [];
+  const originalSources: number[] = [];
+  const originalSampleCounts: number[] = [];
+  const inputFiles = files as string[];
 
-  // Initialize resampler once
-  let resamplerInstance: ResampleAPI | null = null;
-  if (resampler === "zoh") {
-    resamplerInstance = createZohResampler();
-  } else if (resampler === "wasm") {
-    try {
-      resamplerInstance = await createWasmResampler();
-    } catch (error) {
-      // For WASM errors (expected when binary is placeholder), fall back to ffmpeg for testing
-      // In production, this would be a fatal error
-      if (process.env.NODE_ENV === 'test' || error instanceof Error && (
-        error.message.includes('expected magic word 00 61 73 6d') ||
-        error.message.includes('WASM file not found')
-      )) {
-        console.warn(`WASM resampler not available, falling back to ffmpeg for testing: ${error instanceof Error ? error.message : String(error)}`);
-        // Don't set resamplerInstance - will use fallback logic later
-      } else {
-        console.error(`Error initializing WASM resampler: ${error instanceof Error ? error.message : String(error)}`);
-        process.exit(1);
-      }
-    }
+  let effectiveResampler = resampler;
+  let resamplerMetaUsed: { name: string; version: string; sha256?: string } | null = null;
+
+  if (resampler === "ffmpeg") {
+    resamplerMetaUsed = { name: "ffmpeg", version: "unknown" };
   }
 
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i] as string;
-
-    if (verbose) {
-      console.error(`Processing ${file}...`);
-    }
+  for (let i = 0; i < inputFiles.length; i++) {
+    const file = inputFiles[i];
 
     try {
-      // Check file exists first
       if (!fs.existsSync(file)) {
         throw errors.fileNotFound(file);
       }
 
-      // Find manifest entry for this file (normalize paths for Windows compatibility)
-      const normalizedFile = file.split(path.sep).join('/');
-      const manifestEntry = manifestEntries.find(entry => {
-        const normalizedEntry = entry.filepath.split(path.sep).join('/');
+      const normalizedFile = file.split(path.sep).join("/");
+      const manifestEntry = manifestEntries.find((entry) => {
+        const normalizedEntry = entry.filepath.split(path.sep).join("/");
         return normalizedEntry === normalizedFile;
       });
       if (!manifestEntry) {
@@ -325,8 +320,7 @@ For more information, see README.md`
       }
 
       const { note: fileNote } = manifestEntry;
-      
-      // Wrap noteToTargetHz to catch invalid note errors
+
       let targetHz: number;
       try {
         targetHz = noteToTargetHz(fileNote);
@@ -334,22 +328,17 @@ For more information, see README.md`
         throw errors.invalidNote(fileNote);
       }
 
-      // Decode with better error handling
-      let pcm16: Int16Array;
-      let srcHz: number;
+      let decoded: { data: Int16Array; srcHz: number };
       try {
-        const decoded = await decodePCM16Mono(file);
-        pcm16 = decoded.data;
-        srcHz = decoded.srcHz;
+        decoded = await decodePCM16Mono(file);
       } catch (error) {
-        // Map node-io errors to CLI errors
         if (error instanceof Error) {
-          if (error.message.includes('channels')) {
+          if (error.message.includes("channels")) {
             const match = error.message.match(/(\d+) channels/);
             const channels = match ? parseInt(match[1]) : 2;
             throw errors.nonMono(file, channels);
           }
-          if (error.message.includes('file not found')) {
+          if (error.message.includes("file not found")) {
             throw errors.fileNotFound(file);
           }
           throw errors.unsupportedAudio(file);
@@ -357,94 +346,104 @@ For more information, see README.md`
         throw errors.unreadableFile(file);
       }
 
+      const { data: pcm16, srcHz } = decoded;
+
       if (pcm16.length === 0) {
         throw errors.emptyAudio(file);
       }
 
-      // Validate mono (decodePCM16Mono already does this, but keep for safety)
-      validateMonoPcm16(pcm16, 1);
+      originalSources.push(srcHz);
+      originalSampleCounts.push(pcm16.length);
 
-      // Resample if needed
-      let resampledPcm16 = pcm16;
-      if (srcHz !== targetHz) {
-        if (resampler === "ffmpeg") {
-          resampledPcm16 = await decodeAndResampleToPcm16(file, targetHz);
-        } else if (resampler === "zoh" && resamplerInstance) {
-          resampledPcm16 = resamplerInstance.resamplePCM16(pcm16, srcHz, targetHz);
-        } else if (resampler === "wasm" && resamplerInstance) {
-          resampledPcm16 = resamplerInstance.resamplePCM16(pcm16, srcHz, targetHz);
-        } else if (resampler === "wasm" && !resamplerInstance) {
-          // WASM requested but not available (testing scenario) - use ffmpeg as fallback
-          if (verbose) {
-            console.error(`WASM resampler not available, using ffmpeg fallback for ${file}`);
-          }
-          resampledPcm16 = await decodeAndResampleToPcm16(file, targetHz);
-        } else {
-          // Fallback: assume input is already at target rate
-          if (verbose) {
-            console.error(`Warning: Input rate ${srcHz}Hz != target ${targetHz}Hz, but no resampler available`);
-          }
-        }
+      let pcmForConvert = pcm16;
+      let sourceHzForConvert = srcHz;
+
+      if (effectiveResampler === "ffmpeg") {
+        pcmForConvert = await decodeAndResampleToPcm16(file, targetHz);
+        sourceHzForConvert = targetHz;
       }
 
-      // Convert to 8-bit
-      const sampleData = mapPcm16To8Bit(resampledPcm16);
-      const sampleLength = sampleData.length;
-      const paddedLength = alignTo256(sampleLength);
-
-      if (sampleLength > 0xFFFF) {
-        const segmentLabel = path.basename(file, path.extname(file));
-        console.warn(warnings.oversize(segmentLabel, sampleLength));
-      }
-
-      // Calculate offsets
-      const startByte = currentOffset;
-      const startOffsetHex = Math.floor(startByte / 256)
-        .toString(16)
-        .toUpperCase()
-        .padStart(2, "0");
-
-      const label = path.basename(file, path.extname(file));
-
-      if (verbose) {
-        console.error(`  Source rate: ${srcHz}Hz`);
-        console.error(`  Target rate: ${targetHz}Hz`);
-        console.error(`  Samples: ${pcm16.length} -> ${resampledPcm16.length}`);
-        console.error(`  8-bit length: ${sampleLength} bytes`);
-        console.error(`  Padded length: ${paddedLength} bytes`);
-        console.error(`  Start offset: 0x${startOffsetHex}`);
-        if (resamplerInstance) {
-          console.error(`  Resampler: ${resamplerInstance.meta.name} v${resamplerInstance.meta.version}`);
-        }
-      }
-
-      segments.push({
-        label,
+      convertInputs.push({
+        pcm16: pcmForConvert,
+        label: path.basename(file, path.extname(file)),
         note: fileNote,
-        targetHz,
-        startByte,
-        startOffsetHex,
-        lengthBytes: sampleLength,
-        paddedLengthBytes: paddedLength,
-        paddedLength,
-        sampleData,
+        sourceHz: sourceHzForConvert,
       });
-
-      // Update offset for next segment
-      if (mode === "stacked-equal") {
-        const { slotSize } = calculateStackedEqualLayout([paddedLength]);
-        currentOffset += slotSize;
-      } else {
-        currentOffset += paddedLength;
-      }
-
     } catch (error) {
       if (error instanceof CliError) {
         console.error(error.message);
         process.exit(error.exitCode);
       }
+      if (error instanceof ConversionError) {
+        handleConversionError(error);
+      }
       throw error;
     }
+  }
+
+  let convertResult: ReturnType<typeof convert>;
+  try {
+    convertResult = convert(convertInputs, { mode: mode as ConvertMode });
+  } catch (error) {
+    if (error instanceof ConversionError) {
+      handleConversionError(error);
+    }
+    throw error;
+  }
+  if (!resamplerMetaUsed) {
+    resamplerMetaUsed = {
+      name: convertResult.resampler.name.toLowerCase(),
+      version: convertResult.resampler.version,
+    };
+  }
+
+  convertResult.totalInputSamples = originalSampleCounts.reduce((sum, count) => sum + count, 0);
+  convertResult.segments.forEach((segment, index) => {
+    segment.sourceHz = originalSources[index];
+  });
+
+  const bodyBytes = convertResult.outputBytes;
+  const cliSegments: SampleSegment[] = convertResult.segments.map((segment, index) => {
+    const startByte = segment.startByte;
+    const paddedLength = segment.paddedLengthBytes;
+    const paddedView = bodyBytes.subarray(startByte, startByte + paddedLength);
+    const sampleData = paddedView.slice(0, segment.lengthBytes);
+
+    if (segment.lengthBytes > 0xFFFF) {
+      console.warn(warnings.oversize(segment.label, segment.lengthBytes));
+    }
+
+    return {
+      label: segment.label,
+      note: segment.note,
+      sourceHz: originalSources[index],
+      targetHz: segment.targetHz,
+      startByte: segment.startByte,
+      startOffsetHex: segment.startOffsetHex,
+      lengthBytes: segment.lengthBytes,
+      paddedLengthBytes: segment.paddedLengthBytes,
+      paddedLength: segment.paddedLengthBytes,
+      sampleData,
+    };
+  });
+
+  if (verbose) {
+    cliSegments.forEach((segment, index) => {
+      const file = inputFiles[index];
+      console.error(`Processing ${file}...`);
+      console.error(`  Source rate: ${originalSources[index]}Hz`);
+      console.error(`  Target rate: ${segment.targetHz}Hz`);
+      console.error(`  Samples: ${originalSampleCounts[index]} -> ${segment.lengthBytes}`);
+      console.error(`  8-bit length: ${segment.lengthBytes} bytes`);
+      console.error(`  Padded length: ${segment.paddedLengthBytes} bytes`);
+      console.error(`  Start offset: 0x${segment.startOffsetHex}`);
+      if (resamplerMetaUsed) {
+        console.error(`  Resampler: ${resamplerMetaUsed.name} v${resamplerMetaUsed.version}`);
+        if (resamplerMetaUsed.sha256) {
+          console.error(`  Resampler SHA256: ${resamplerMetaUsed.sha256}`);
+        }
+      }
+    });
   }
 
   // Generate output filename
@@ -454,10 +453,15 @@ For more information, see README.md`
   if (mode === "single") {
     outputFilename = generateSingleFilename(baseName);
   } else if (mode === "stacked") {
-    outputFilename = generateStackedFilename(baseName, segments);
-  } else { // stacked-equal
-    const { increment } = calculateStackedEqualLayout(segments.map(s => s.paddedLengthBytes));
-    outputFilename = generateStackedEqualFilename(baseName, increment);
+    const stackedSummary = cliSegments.map((segment) => ({
+      startByte: segment.startByte,
+      paddedLength: segment.paddedLengthBytes,
+    }));
+    outputFilename = generateStackedFilename(baseName, stackedSummary);
+  } else {
+    const slotIncrement =
+      cliSegments.length > 0 ? cliSegments[0].paddedLengthBytes >> 8 : 0;
+    outputFilename = generateStackedEqualFilename(baseName, slotIncrement);
   }
 
   const outputPath = path.join(outDir, outputFilename);
@@ -470,7 +474,7 @@ For more information, see README.md`
 
   // Create 8SVX file
   try {
-    await createEightSVXFile(outputPath, segments, mode);
+    await createEightSVXFile(outputPath, cliSegments, mode, bodyBytes);
   } catch {
     throw errors.writeFailed(outputPath);
   }
@@ -482,22 +486,21 @@ For more information, see README.md`
   // Write report if requested
   if (emitReport) {
     // Get resampler metadata
-    let resamplerMeta: { name: string; version: string; sha256?: string } = {
-      name: resampler,
-      version: "unknown",
-      sha256: undefined
-    };
-    if (resamplerInstance) {
-      resamplerMeta = resamplerInstance.meta;
-    }
+    const resamplerMeta: { name: string; version: string; sha256?: string } =
+      resamplerMetaUsed ?? { name: resampler, version: "unknown" };
 
     // Get versions using the same logic as tools/versions.mjs
     const versions = getVersions();
-    
-    const report: Report = {
+
+    const reportSegments: ReportSegment[] = convertResult.segments.map((segment) => ({
+      ...segment,
+    }));
+
+    const report: CliReport = {
       mode,
       outputFile: outputFilename,
-      segments,
+      segments: reportSegments,
+      resampler: convertResult.resampler,
       versions: {
         node: versions.node,
         pnpm: versions.pnpm,
@@ -521,7 +524,8 @@ For more information, see README.md`
 async function createEightSVXFile(
   outputPath: string,
   segments: SampleSegment[],
-  _mode: StackingMode
+  _mode: StackingMode,
+  bodyBytes: Uint8Array
 ): Promise<void> {
   const fd = fs.openSync(outputPath, "w");
 
@@ -544,8 +548,10 @@ async function createEightSVXFile(
     totalSize += 8;
 
     // Sample data (padded to 256-byte boundaries)
+    let bodySize = 0;
     for (const segment of segments) {
       totalSize += segment.paddedLengthBytes;
+      bodySize += segment.paddedLengthBytes;
     }
 
     // Write FORM header
@@ -601,7 +607,7 @@ async function createEightSVXFile(
     // Write BODY chunk header
     const bodyChunk: BODYChunk = {
       magic: BODY_CHUNK,
-      size: totalSize - 8 - 28 - (8 + nameChunkSize) - 8,
+      size: bodySize,
     };
 
     const bodyHeaderBuffer = Buffer.alloc(8);
@@ -613,10 +619,13 @@ async function createEightSVXFile(
     let currentPosition = 40 + 8 + nameChunkSize + 8;
 
     for (const segment of segments) {
-      const sampleBuffer = Buffer.alloc(segment.paddedLengthBytes, 0x80); // Silence at 0x80 (128)
-      // Copy actual sample data
-      sampleBuffer.fill(segment.sampleData, 0, Math.min(segment.sampleData.length, segment.paddedLengthBytes));
-      fs.writeSync(fd, sampleBuffer, 0, segment.paddedLengthBytes, currentPosition);
+      fs.writeSync(
+        fd,
+        bodyBytes,
+        segment.startByte,
+        segment.paddedLengthBytes,
+        currentPosition
+      );
       currentPosition += segment.paddedLengthBytes;
     }
 
@@ -629,6 +638,9 @@ main().catch((error) => {
   if (error instanceof CliError) {
     console.error(error.message);
     process.exit(error.exitCode);
+  }
+  if (error instanceof ConversionError) {
+    handleConversionError(error);
   }
   console.error("Error:", error instanceof Error ? error.message : String(error));
   process.exit(1);

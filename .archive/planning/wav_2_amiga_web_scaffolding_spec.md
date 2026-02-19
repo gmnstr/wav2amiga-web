@@ -49,6 +49,7 @@ Pin via: packageManager field, engines, Volta, lockfile committed, and overrides
 ## 2. Root configuration files
 
 package.json (root)
+
 ```
 {
   "name": "wav2amiga-web",
@@ -58,7 +59,7 @@ package.json (root)
   "volta": { "node": "20.17.0", "pnpm": "9.10.0" },
   "workspaces": ["packages/*", "apps/*"],
   "scripts": {
-    "build": "pnpm -r --filter ./packages/* --filter ./apps/* run build",
+    "build": "pnpm -r --filter './packages/*' --filter './apps/*' run build",
     "lint": "pnpm -r exec eslint .",
     "test": "pnpm run test:unit && pnpm run test:golden:wasm",
     "test:unit": "pnpm -r --filter ./packages/core run test",
@@ -79,6 +80,7 @@ package.json (root)
 ```
 
 .gitattributes
+
 ```
 * text=auto eol=lf
 *.md      text eol=lf
@@ -93,6 +95,7 @@ goldens/** -text binary
 ```
 
 .gitignore
+
 ```
 node_modules/
 dist/
@@ -104,6 +107,7 @@ coverage/
 ```
 
 .devcontainer/devcontainer.json (optional, improves parity)
+
 ```
 {
   "name": "wav2amiga-web",
@@ -117,6 +121,7 @@ coverage/
 ```
 
 .github/workflows/ci.yml
+
 ```
 name: ci
 on: [push, pull_request]
@@ -152,6 +157,7 @@ jobs:
 ## 3. Packages
 
 packages/core/package.json
+
 ```
 {
   "name": "@wav2amiga/core",
@@ -172,6 +178,7 @@ packages/core/package.json
 ```
 
 packages/core/tsconfig.json
+
 ```
 {
   "extends": "../../tsconfig.base.json",
@@ -185,6 +192,7 @@ packages/core/tsconfig.json
 ```
 
 packages/node-io/package.json
+
 ```
 {
   "name": "@wav2amiga/node-io",
@@ -206,6 +214,7 @@ packages/node-io/package.json
 ```
 
 apps/cli/package.json
+
 ```
 {
   "name": "wav2amiga",
@@ -227,6 +236,7 @@ apps/cli/package.json
 ```
 
 apps/web/package.json
+
 ```
 {
   "name": "@wav2amiga/web",
@@ -262,6 +272,7 @@ default golden path uses `--resampler wasm` to guarantee cross-OS identity.
 ## 5. Golden tests
 
 layout
+
 ```
 goldens/
   index.json
@@ -279,6 +290,7 @@ goldens/
 ```
 
 index.json schema
+
 ```
 {
   "version": 1,
@@ -304,6 +316,7 @@ index.json schema
 ```
 
 report.json schema (per case)
+
 ```
 {
   "mode": "stacked|stacked-equal|single",
@@ -330,6 +343,7 @@ report.json schema (per case)
 ```
 
 regeneration guard
+
 - tools/regenerate-goldens.mjs refuses to run unless current versions match index.json
 - on regeneration: writes outputs, computes SHA256, updates index.json
 - CODEOWNERS requires review for goldens/
@@ -339,25 +353,31 @@ regeneration guard
 ## 6. Core tests (vitest) outline
 
 quantization
+
 - mapTo8Bit edges: −32768, −32767, −256, −1, 0, 255, 256, 32767
 
 alignment
+
 - lengths: 1, 255, 256, 257, 511, 512, 513, 65535
 - assert (len + 0xFF) & ~0xFF, no extra padding on multiples of 0x100
 
 stacking
+
 - stacked offsets strictly increase; hex uppercase, zero-padded (2 chars)
 - stacked-equal uses uniform slot size = max(align256(len_i)); increment = slot>>8
 
 filenames
+
 - stacked: basename_00_05_0A.8SVX
 - stacked-equal: basename_05.8SVX
 
 note table
+
 - PAL periods to targetHz = floor/round policy defined in core and tested
 - invalid notes rejected
 
 mono gate
+
 - non-mono inputs rejected (core accepts mono PCM16 only)
 
 ---
@@ -365,6 +385,7 @@ mono gate
 ## 7. CLI test harness
 
 node tools/run-golden-tests.mjs
+
 - reads goldens/index.json
 - for each case:
   - runs CLI with `--resampler wasm` unless `--structure-only`
@@ -373,6 +394,7 @@ node tools/run-golden-tests.mjs
 - writes out/versions.json with tool versions for traceability
 
 node tools/versions.mjs
+
 - prints and writes out/versions.json (Node, pnpm, ffmpeg -version, wasm SHA, git)
 
 ---
@@ -383,7 +405,7 @@ node tools/versions.mjs
 --note <NOTE> (required for single; optional with manifest for stacked modes)
 --manifest <path> (JSON file of { filepath, note } entries for stacked modes)
 --out-dir <dir> (default ./out)
---emit-report (writes _report.json)
+--emit-report (writes \_report.json)
 --resampler wasm|ffmpeg (default wasm for goldens; may default ffmpeg for normal runs)
 --force (overwrite outputs)
 --verbose
@@ -395,15 +417,18 @@ error messages are concise and include filename and reason.
 ## 9. Resampler details
 
 wasm
+
 - libsamplerate (SINC_BEST_QUALITY)
 - identical binary used in Node and web; store SHA256
 - resample from source PCM16 to target PAL rate
 
 ffmpeg
+
 - decode: `-i <file> -ac 1 -f s16le -`
 - if resampling: `-af aresample=resampler=soxr:precision=33:dither_method=none -ar <Hz> -ac 1 -sample_fmt s16`
 
 policy
+
 - core mapping, alignment, stacking are independent of resampler
 - golden tests use wasm path for identity across OS
 
@@ -412,6 +437,7 @@ policy
 ## 10. Web app notes
 
 vite + @wav2amiga/core
+
 - drag-drop mono WAV, select mode and notes, convert in-browser
 - display offsets (start>>8) hex and slot increment for stacked-equal
 - OfflineAudioContext only as last-resort fallback; banner shows preview-only
@@ -438,4 +464,3 @@ vite + @wav2amiga/core
 - web e2e tests
 - signed macOS binaries for CLI
 - docs site and screenshots
-
