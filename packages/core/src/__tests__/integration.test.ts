@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { ResampleAPI, ResamplerMeta } from "../resampler.js";
 
-// Mock WASM resampler for testing
-class MockWasmResampler implements ResampleAPI {
+// Mock resampler for testing metadata handling
+class MockResampler implements ResampleAPI {
   // eslint-disable-next-line no-unused-vars
   constructor(public meta: ResamplerMeta) {
     // meta is used as a public property
@@ -17,22 +17,22 @@ class MockWasmResampler implements ResampleAPI {
   }
 }
 
-describe("WASM resampler integration", () => {
+describe("Resampler integration", () => {
   it("should provide resampler metadata", () => {
-    const resampler = new MockWasmResampler({
-      name: "wasm",
+    const resampler = new MockResampler({
+      name: "zoh",
       version: "1.0.0",
       sha256: "abc123def456"
     });
 
-    expect(resampler.meta.name).toBe("wasm");
+    expect(resampler.meta.name).toBe("zoh");
     expect(resampler.meta.version).toBe("1.0.0");
     expect(resampler.meta.sha256).toBe("abc123def456");
   });
 
   it("should handle same sample rate (no-op)", () => {
-    const resampler = new MockWasmResampler({
-      name: "wasm",
+    const resampler = new MockResampler({
+      name: "zoh",
       version: "1.0.0"
     });
 
@@ -43,8 +43,8 @@ describe("WASM resampler integration", () => {
   });
 
   it("should handle sample rate conversion", () => {
-    const resampler = new MockWasmResampler({
-      name: "wasm",
+    const resampler = new MockResampler({
+      name: "zoh",
       version: "1.0.0"
     });
 
@@ -57,8 +57,8 @@ describe("WASM resampler integration", () => {
 
   it("should clamp output values to int16 range", () => {
     // Test that would fail if clamping wasn't implemented
-    const resampler = new MockWasmResampler({
-      name: "wasm",
+    const resampler = new MockResampler({
+      name: "zoh",
       version: "1.0.0"
     });
 
@@ -96,7 +96,7 @@ describe("Report structure with resampler metadata", () => {
         pnpm: "9.0.0",
         ffmpeg: "6.0.0",
         resampler: {
-          name: "wasm",
+          name: "zoh",
           version: "1.0.0",
           sha256: "abc123def456"
         },
@@ -104,7 +104,7 @@ describe("Report structure with resampler metadata", () => {
       }
     };
 
-    expect(report.versions.resampler.name).toBe("wasm");
+    expect(report.versions.resampler.name).toBe("zoh");
     expect(report.versions.resampler.version).toBe("1.0.0");
     expect(report.versions.resampler.sha256).toBe("abc123def456");
   });

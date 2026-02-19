@@ -4,7 +4,7 @@
  */
 
 export interface ResamplerMeta {
-  name: 'wasm' | 'ffmpeg' | 'zoh';
+  name: 'ffmpeg' | 'zoh';
   version: string;
   sha256?: string;
 }

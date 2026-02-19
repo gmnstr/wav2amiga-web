@@ -5,28 +5,26 @@
     {
       "label": "input",
       "note": "C-2",
+      "sourceHz": 8287,
       "targetHz": 8287,
       "startByte": 0,
       "startOffsetHex": "00",
       "lengthBytes": 4,
-      "paddedLengthBytes": 256,
-      "paddedLength": 256,
-      "sampleData": {
-        "0": 225,
-        "1": 225,
-        "2": 127,
-        "3": 127
-      }
+      "paddedLengthBytes": 256
     }
   ],
+  "resampler": {
+    "name": "ZOH",
+    "version": "1.0.0"
+  },
   "versions": {
-    "node": "v20.19.0",
+    "node": "v20.19.5",
     "pnpm": "9.10.0",
     "ffmpeg": "unknown",
     "resampler": {
       "name": "zoh",
       "version": "1.0.0"
     },
-    "git": "a20d239a1981d3196d31f1c91602f3b8dd22bd7e"
+    "git": "0c921e165dcf552c6a0319f47087e535537f50c4"
   }
 }

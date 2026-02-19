@@ -2,18 +2,17 @@
 
 ## Overview
 
-The Wav2Amiga web application provides a browser-based interface for converting WAV files to Amiga 8SVX format. It runs entirely in the browser using WebAssembly for deterministic resampling.
+The Wav2Amiga web application provides a browser-based interface for converting WAV files to Amiga 8SVX format. It runs entirely in the browser using the deterministic ZOH resampler shared with the CLI.
 
 ## Browser Compatibility
 
 ### Supported Browsers
-- **Chrome**: 90+ (WebAssembly support)
-- **Firefox**: 88+ (WebAssembly support)
-- **Safari**: 14+ (WebAssembly support)
-- **Edge**: 90+ (WebAssembly support)
+- **Chrome**: 90+
+- **Firefox**: 88+
+- **Safari**: 14+
+- **Edge**: 90+
 
 ### Required Features
-- WebAssembly support
 - File API (FileReader)
 - ArrayBuffer support
 - ES2020 modules
@@ -175,11 +174,11 @@ const result = await convertAudio(files, options, {
 - Deterministic output
 - Fast processing
 
-#### WebAudio Fallback
-- Used when WebAssembly fails to load
-- Non-deterministic across browsers
+#### WebAudio Preview (Optional)
+- Browser-native resampling path for quick previews
+- Non-deterministic across browsers; not used for exports
 - Labeled as "Preview Quality"
-- Faster loading
+- Avoid for golden outputs
 
 ### Performance Settings
 
@@ -212,18 +211,6 @@ try {
     console.error('File must be mono:', error.message);
   } else if (error.code === 'EMPTY_AUDIO') {
     console.error('File contains no audio data:', error.message);
-  }
-}
-```
-
-### WebAssembly Errors
-```javascript
-try {
-  const result = await convertAudio(files, options);
-} catch (error) {
-  if (error.code === 'WASM_LOAD_FAILED') {
-    console.warn('WebAssembly failed to load, using fallback');
-    // Fallback to WebAudio
   }
 }
 ```
@@ -315,8 +302,8 @@ try {
 - Implement file size limits
 
 ### Caching
-- Cache WebAssembly module
-- Cache resampler instances
+- Cache ZOH resampler instances
+- Cache intermediate analysis (e.g., decoded PCM) where appropriate
 - Implement result caching for repeated conversions
 
 ## Security Considerations
@@ -330,18 +317,13 @@ try {
 ```html
 <meta http-equiv="Content-Security-Policy" 
       content="default-src 'self'; 
-               script-src 'self' 'wasm-unsafe-eval'; 
+               script-src 'self'; 
                worker-src 'self' blob:;">
 ```
 
 ## Troubleshooting
 
 ### Common Issues
-
-#### WebAssembly Not Loading
-- Check browser compatibility
-- Verify Content Security Policy
-- Check console for loading errors
 
 #### File Processing Fails
 - Verify file is valid WAV format

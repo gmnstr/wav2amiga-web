@@ -11,7 +11,6 @@
     "yargs": "17.7.2",
     "@wav2amiga/core": "workspace:*",
     "@wav2amiga/node-io": "workspace:*",
-    "@wav2amiga/resampler-wasm": "workspace:*",
     "@wav2amiga/resampler-zoh": "workspace:*"
   },
   "devDependencies": {
