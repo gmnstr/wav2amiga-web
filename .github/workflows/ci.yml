@@ -1,8 +1,8 @@
 name: ci
-on: 
+on:
   push:
     branches: [main]
-    tags: ['v*']
+    tags: ["v*"]
   pull_request:
     branches: [main]
 
@@ -24,8 +24,8 @@ jobs:
       - run: corepack enable
       - uses: actions/setup-node@v4.4.0
         with:
-          node-version: '20.x'
-          cache: 'pnpm'
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
       - name: Environment dump
         run: |
           echo "OS: $(uname -a)"
@@ -67,8 +67,8 @@ jobs:
       - run: corepack enable
       - uses: actions/setup-node@v4.4.0
         with:
-          node-version: '20.x'
-          cache: 'pnpm'
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
       - name: Environment dump
         run: |
           echo "OS: $(uname -a || echo Windows)"
@@ -108,8 +108,8 @@ jobs:
       - run: corepack enable
       - uses: actions/setup-node@v4.4.0
         with:
-          node-version: '20.x'
-          cache: 'pnpm'
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
       - name: Run contract tests
@@ -131,8 +131,8 @@ jobs:
       - run: corepack enable
       - uses: actions/setup-node@v4.4.0
         with:
-          node-version: '20.x'
-          cache: 'pnpm'
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
       - name: Environment dump
         run: |
           echo "OS: $(uname -a)"
@@ -203,8 +203,8 @@ jobs:
       - run: corepack enable
       - uses: actions/setup-node@v4.4.0
         with:
-          node-version: '20.x'
-          cache: 'pnpm'
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
       - run: pnpm install --frozen-lockfile
       - run: node tools/check-toolchain.mjs
       - run: pnpm run build
@@ -227,9 +227,9 @@ jobs:
           name: Release ${{ github.ref_name }}
           body: |
             ## wav2amiga ${{ github.ref_name }}
-            
+
             This release includes:
-            
+
             - **ZOH Resampler**: Zero-order hold resampler for deterministic, high-quality audio conversion
             - **Three Output Modes**: Single, stacked, and stacked-equal sample layouts
             - **CLI Tool**: Command-line interface with FFmpeg decode support
@@ -238,35 +238,35 @@ jobs:
             - **Byte-Equal Golden Tests**: CI-gated tests ensure deterministic outputs
             - **Examples**: Reproducible test cases with SHA256 verification
             - **API Stability**: Contract tests guard public API surface
-            
+
             ### Installation
-            
+
             ```bash
             npm install -g wav2amiga
             ```
-            
+
             ### Usage
-            
+
             ```bash
             # Convert single sample
             wav2amiga --mode single --note C-2 input.wav
-            
+
             # Convert multiple samples
             wav2amiga --mode stacked --manifest manifest.json
             ```
-            
+
             See [README.md](README.md) for complete documentation.
-            
+
             ### Determinism
-            
+
             This release provides byte-identical outputs across platforms through:
             - ZOH resampler (no interpolation)
             - Pure integer math
             - Node 20.x policy
             - CI-gated golden tests
-            
+
             ### Files
-            
+
             - `wav2amiga-${{ github.ref_name }}.tgz` - CLI package
             - `wav2amiga-web-${{ github.ref_name }}.zip` - Web interface
             - `versions.json` - Toolchain information
