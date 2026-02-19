@@ -23,7 +23,9 @@
     "publish:dryrun": "pnpm run publish:dry-run",
     "web:start": "scripts/web-start.sh",
     "web:stop": "scripts/web-stop.sh",
-    "web:status": "scripts/web-status.sh"
+    "web:status": "scripts/web-status.sh",
+    "web:sync-demo": "scripts/web-sync-demo.sh sync",
+    "web:check-demo": "scripts/web-sync-demo.sh check"
   },
   "devDependencies": {
     "@eslint/js": "9.11.0",
