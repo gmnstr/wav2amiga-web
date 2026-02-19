@@ -19,18 +19,21 @@ Convert WAV files to Amiga 8SVX format with high-quality resampling.
 ## Resampling Options
 
 ### ZOH (Default)
+
 - **Zero-order hold**: No interpolation, preserves sharp attacks and transients
 - **No low-pass filtering**: Maintains high-frequency content
 - **Paula-compatible**: Matches Amiga hardware sample-and-hold behavior
 - **Deterministic**: Pure integer math with consistent results across platforms
 
 ### FFmpeg (Optional)
+
 - **Interpolated resampling**: Uses low-pass filtering for smooth results
 - **Comparison mode**: Use `--resampler ffmpeg` to compare with ZOH output
 
 ## Usage
 
 ### CLI
+
 ```bash
 # Convert single file with ZOH resampling (default)
 wav2amiga --mode single --note C-2 input.wav
@@ -43,6 +46,7 @@ wav2amiga --mode single --note C-2 --emit-report input.wav
 ```
 
 ### Web Interface
+
 Open `apps/web/dist/index.html` in your browser for drag-and-drop conversion.
 
 ## Development
@@ -62,6 +66,7 @@ pnpm test:golden:zoh
 ```
 
 ### Web dev server
+
 ```bash
 pnpm run web:start   # http://localhost:5173
 pnpm run web:stop
@@ -80,6 +85,10 @@ pnpm run web:status
 - **apps/web**: Browser-based interface
 
 For detailed architecture information, see [System Architecture](docs/architecture.md).
+
+## Credits
+
+This project is a TypeScript port of [Wav2Amiga](https://github.com/djh0ffman/Wav2Amiga) by [djh0ffman](https://github.com/djh0ffman). The original Amiga 8SVX conversion logic and resampling approach were adapted from the C# reference implementation.
 
 ## License
 
