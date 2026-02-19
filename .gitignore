@@ -11,3 +11,6 @@ coverage/
 
 # Archive folder
 .archive/
+
+# Local reference clone
+reference/
